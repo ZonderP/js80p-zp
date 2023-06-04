@@ -20,17 +20,21 @@
 #ifndef JS80P__PLUGIN__FST__PLUGIN_HPP
 #define JS80P__PLUGIN__FST__PLUGIN_HPP
 
+#undef _STANDARD_PARAMETER_AUTOMATION_BY_PATRIK
+#undef _USE_VECTOR_OPTIONS
+
 //#define _ORI_PARAMETER_AUTOMATION_BY_ATTILA
-#if (defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
-    #undef _STANDARD_PARAMETER_AUTOMATION_BY_PATRIK
-#else  // #if (!defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
+#if (!defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
     #define _STANDARD_PARAMETER_AUTOMATION_BY_PATRIK
+    #if (defined (_STANDARD_PARAMETER_AUTOMATION_BY_PATRIK))
+        //#define _USE_VECTOR_OPTIONS // This doesn't link currently, probably due to detected intitialisation issues...
+    #endif  // #if (defined (_STANDARD_PARAMETER_AUTOMATION_BY_PATRIK))
 #endif  // #if (!defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
 
 #include <string>
-#if (defined (_STANDARD_PARAMETER_AUTOMATION_BY_PATRIK))
+#if (!defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
 #include <array>
-#endif  // #if (defined (_STANDARD_PARAMETER_AUTOMATION_BY_PATRIK))
+#endif  // #if (!defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
 
 #include <fst/fst.h>
 
@@ -224,6 +228,12 @@ class FstPlugin : public Midi::EventHandler
             MidiController* midi_controller
         ) noexcept;
 #else   // #if (!defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
+
+#if (!defined (_STANDARD_PARAMETER_AUTOMATION_BY_PATRIK) || !defined (_USE_VECTOR_OPTIONS))
+        static char const* const OFF_ON[];
+        static int const OFF_ON_COUNT;
+#endif  // #if (!defined (_STANDARD_PARAMETER_AUTOMATION_BY_PATRIK) || !defined (_USE_VECTOR_OPTIONS))
+
 #if (defined (_STANDARD_PARAMETER_AUTOMATION_BY_PATRIK))
         struct FloatParamInfo {
             FloatParamInfo(std::string_view n, double s = 100.0, std::string_view f = "%.2f", std::string_view l = "%")
@@ -236,8 +246,7 @@ class FstPlugin : public Midi::EventHandler
         };
         using float_param_infos_t = std::array<FloatParamInfo, Synth::FLOAT_PARAMS>;
         static const float_param_infos_t float_param_infos;
-//#define N_T_C
-#ifdef N_T_C
+#if (defined (_USE_VECTOR_OPTIONS))
     public:
         using options_t = std::vector<std::string>;
         static const options_t modes;
@@ -252,10 +261,7 @@ class FstPlugin : public Midi::EventHandler
             std::string name; // friendly, should not be longer than 16 bytes including 0 terminator!
             const options_t* options;
         };
-#else   // #ifndef N_T_C
-        static char const* const OFF_ON[];
-        static int const OFF_ON_COUNT;
-
+#else   // #if (!defined (_USE_VECTOR_OPTIONS))
         struct IntParamInfo {
             IntParamInfo(std::string_view n, char const* const* const o, int no_of_o)
             : name(n), options(o), number_of_options(no_of_o) {
@@ -264,7 +270,7 @@ class FstPlugin : public Midi::EventHandler
             char const* const* const options;
             int const number_of_options;
         };
-#endif  // #ifndef N_T_C
+#endif  // #if (!defined (_USE_VECTOR_OPTIONS))
         using int_param_infos_t = std::array<IntParamInfo, Synth::MAX_PARAM_ID - Synth::FLOAT_PARAMS>;
         static const int_param_infos_t int_param_infos;
 #else   // #if (!defined (_STANDARD_PARAMETER_AUTOMATION_BY_PATRIK))
@@ -336,7 +342,7 @@ class FstPlugin : public Midi::EventHandler
             char const* const* const options{nullptr};
             int const number_of_options{0};
         };
-        using param_infos_t = std::array<const ParamInfo*, 7>;
+        using param_infos_t = std::array<const ParamInfo*, 9>;
         static const param_infos_t param_infos;
 #endif  // #if (!defined (_STANDARD_PARAMETER_AUTOMATION_BY_PATRIK))
 #endif  // #if (!defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))

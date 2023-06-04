@@ -693,13 +693,16 @@ Sample const* const* FstPlugin::render_next_round(VstInt32 sample_count) noexcep
             (Number)parameters[0].get_value()
         );
     }
+#endif  //#if (defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
 
     size_t const next_program = this->next_program;
     size_t const current_program = bank.get_current_program_index();
 
+#if (defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
     for (size_t i = 0; i != NUMBER_OF_PARAMETERS; ++i) {
         parameters[i].update_midi_controller_if_dirty();
     }
+#endif  //#if (defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
 
     if (next_program != current_program) {
         if (save_current_patch_before_changing_program) {
@@ -711,7 +714,6 @@ Sample const* const* FstPlugin::render_next_round(VstInt32 sample_count) noexcep
         bank.set_current_program_index(next_program);
         import_patch(bank[next_program].serialize());
     }
-#endif  //#if (defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
     round = (round + 1) & ROUND_MASK;
     update_bpm();
 
@@ -880,6 +882,17 @@ void FstPlugin::set_program(size_t index) noexcept
     parameters[0].set_value(
         (float)Bank::program_index_to_normalized_parameter_value(index)
     );
+#else
+    size_t const current_program{bank.get_current_program_index()};
+    if (index != current_program) {
+        if (save_current_patch_before_changing_program) {
+            bank[current_program].import(Serializer::serialize(&synth));
+        } else {
+            save_current_patch_before_changing_program = true;
+        }
+        bank.set_current_program_index(index);
+        import_patch(bank[index].serialize());
+    }
 #endif  // #if (defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
 }
 
@@ -1148,6 +1161,15 @@ void FstPlugin::get_param_name(size_t index, char* buffer) const noexcept
 }
 
 #else   // #if (!defined (_ORI_PARAMETER_AUTOMATION_BY_ATTILA))
+
+#if (!defined (_STANDARD_PARAMETER_AUTOMATION_BY_PATRIK) || !defined (_USE_VECTOR_OPTIONS))
+char const* const FstPlugin::OFF_ON[] = {
+    "Off",
+    "On"
+};
+int const FstPlugin::OFF_ON_COUNT = 2;
+#endif  // #if (!defined (_STANDARD_PARAMETER_AUTOMATION_BY_PATRIK) || !defined (_USE_VECTOR_OPTIONS))
+
 
 #if (defined (_STANDARD_PARAMETER_AUTOMATION_BY_PATRIK))
 
@@ -1428,7 +1450,7 @@ const FstPlugin::float_param_infos_t FstPlugin::float_param_infos {
     , FloatParamInfo{"L8RND"}
 };
 
-#ifdef N_T_C
+#if (defined (_USE_VECTOR_OPTIONS))
 const FstPlugin::options_t modes {
     "Mix&Mod"
     , "Split C3"
@@ -1456,7 +1478,6 @@ const FstPlugin::options_t waveforms {
     , "Square"
     , "Soft Sqr"
     , "Custom"
-
 };
 const FstPlugin::options_t biquad_filter_types {
     "LP"
@@ -1471,7 +1492,6 @@ const FstPlugin::options_t off_on {
     "Off"
     , "On"
 };
-
 const FstPlugin::int_param_infos_t FstPlugin::int_param_infos {
     // Synth - Global - Mode
       IntParamInfo{"MODE", &FstPlugin::modes}
@@ -1497,17 +1517,37 @@ const FstPlugin::int_param_infos_t FstPlugin::int_param_infos {
     , IntParamInfo{"L6WAV", &FstPlugin::waveforms}
     , IntParamInfo{"L7WAV", &FstPlugin::waveforms}
     , IntParamInfo{"L8WAV", &FstPlugin::waveforms}
+    // LFOs - LFO 1 - 8 Tempo Synchronization
+    , IntParamInfo{"L1SYN", &FstPlugin::off_on}
+    , IntParamInfo{"L2SYN", &FstPlugin::off_on}
+    , IntParamInfo{"L3SYN", &FstPlugin::off_on}
+    , IntParamInfo{"L4SYN", &FstPlugin::off_on}
+    , IntParamInfo{"L5SYN", &FstPlugin::off_on}
+    , IntParamInfo{"L6SYN", &FstPlugin::off_on}
+    , IntParamInfo{"L7SYN", &FstPlugin::off_on}
+    , IntParamInfo{"L8SYN", &FstPlugin::off_on}
+    // Effects - Echo Tempo Synchronization
+    , IntParamInfo{"EESYN", &FstPlugin::off_on}
+    // Synth - Modulator Filters 1 & 2 Logarithmic Frequency
+    , IntParamInfo{"MF1LOG", &FstPlugin::off_on}
+    , IntParamInfo{"MF2LOG", &FstPlugin::off_on}
+    // Synth - Carrier Filters 1 & 2 Logarithmic Frequency
+    , IntParamInfo{"CF1LOG", &FstPlugin::off_on}
+    , IntParamInfo{"CF2LOG", &FstPlugin::off_on}
+    // Effects - Filters 1 & 2 Logarithmic Frequency
+    , IntParamInfo{"EF1LOG", &FstPlugin::off_on}
+    , IntParamInfo{"EF2LOG", &FstPlugin::off_on}
+    // LFOs - LFO 1 - 8 Center
+    , IntParamInfo{"L1CEN", &FstPlugin::off_on}
+    , IntParamInfo{"L2CEN", &FstPlugin::off_on}
+    , IntParamInfo{"L3CEN", &FstPlugin::off_on}
+    , IntParamInfo{"L4CEN", &FstPlugin::off_on}
+    , IntParamInfo{"L5CEN", &FstPlugin::off_on}
+    , IntParamInfo{"L6CEN", &FstPlugin::off_on}
+    , IntParamInfo{"L7CEN", &FstPlugin::off_on}
+    , IntParamInfo{"L8CEN", &FstPlugin::off_on}
 };
-
-#else   // #ifdef N_T_C
-
-char const* const FstPlugin::OFF_ON[] = {
-    "Off",
-    "On"
-};
-int const FstPlugin::OFF_ON_COUNT = 2;
-
-
+#else   // #if (!defined (_USE_VECTOR_OPTIONS))
 const FstPlugin::int_param_infos_t FstPlugin::int_param_infos {
     // Synth - Global - Mode
       IntParamInfo{"MODE", JS80P::GUI::MODES, JS80P::GUI::MODES_COUNT}
@@ -1563,7 +1603,7 @@ const FstPlugin::int_param_infos_t FstPlugin::int_param_infos {
     , IntParamInfo{"L7CEN", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
     , IntParamInfo{"L8CEN", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
 };
-#endif  // #ifdef N_T_C
+#endif  // #if (!defined (_USE_VECTOR_OPTIONS))
 
 float FstPlugin::get_parameter(size_t index) const noexcept
 {
@@ -1602,13 +1642,13 @@ void FstPlugin::get_param_display(size_t index, char* display) const noexcept
     } else {
         const auto& param_info{int_param_infos[index - Synth::FLOAT_PARAMS]};
         auto value{synth.int_param_ratio_to_display_value(ParamId, ratio)};
-#ifdef N_T_C
+#if (defined (_USE_VECTOR_OPTIONS))
         if (value < param_info.options->size()) {
             snprintf(display, 9, "%s", param_info.options->at(value).c_str());
-#else
+#else   // #if (!defined (_USE_VECTOR_OPTIONS))
         if (value < param_info.number_of_options) {
             snprintf(display, 9, "%s", param_info.options[value]);
-#endif
+#endif  // #if (!defined (_USE_VECTOR_OPTIONS))
         } else {
             strncpy(display, "???", 4);
         }
@@ -1651,6 +1691,10 @@ const FstPlugin::param_infos_t FstPlugin::param_infos {
     , new FloatParamInfo{Synth::ParamId::MF2Q, "MF2Q", 1.0, "%.2f", ""}
     , new FloatParamInfo{Synth::ParamId::MF2G, "MF2G", 1.0, "%.2f", "dB"}
     , new FloatParamInfo{Synth::ParamId::MF1FRQ, "MF1FRQ", 1.0, "%.1f", "Hz"}
+    // Effects - Filters 1 & 2 Logarithmic Frequency
+    , new IntParamInfo{Synth::ParamId::EF1LOG, "EF1LOG", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
+    // LFOs - LFO 1 - 8 Center
+    , new IntParamInfo{Synth::ParamId::L1CEN, "L1CEN", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
 };
 
 float FstPlugin::get_parameter(size_t index) const noexcept
