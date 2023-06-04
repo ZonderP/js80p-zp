@@ -1553,6 +1553,15 @@ const FstPlugin::int_param_infos_t FstPlugin::int_param_infos {
     // Effects - Filters 1 & 2 Logarithmic Frequency
     , IntParamInfo{"EF1LOG", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
     , IntParamInfo{"EF2LOG", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
+    // LFOs - LFO 1 - 8 Center
+    , IntParamInfo{"L1CEN", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
+    , IntParamInfo{"L2CEN", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
+    , IntParamInfo{"L3CEN", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
+    , IntParamInfo{"L4CEN", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
+    , IntParamInfo{"L5CEN", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
+    , IntParamInfo{"L6CEN", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
+    , IntParamInfo{"L7CEN", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
+    , IntParamInfo{"L8CEN", FstPlugin::OFF_ON, JS80P::FstPlugin::OFF_ON_COUNT}
 };
 #endif  // #ifdef N_T_C
 
