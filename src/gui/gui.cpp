@@ -172,6 +172,17 @@ char const* const GUI::PARAMS[] = {
     [Synth::ParamId::EF2Q] = "Filter 2 Q Factor",
     [Synth::ParamId::EF2G] = "Filter 2 Gain (dB)",
 
+    [Synth::ParamId::ECDEL] = "Chorus Delay (s)",
+    [Synth::ParamId::ECFRQ] = "Chorus LFO Frequency (Hz)",
+    [Synth::ParamId::ECDPT] = "Chorus Depth (%)",
+    [Synth::ParamId::ECFB] = "Chorus Feedback (%)",
+    [Synth::ParamId::ECDF] = "Chorus Dampening Frequency (Hz)",
+    [Synth::ParamId::ECDG] = "Chorus Dampening Gain (dB)",
+    [Synth::ParamId::ECWID] = "Chorus Stereo Width (%)",
+    [Synth::ParamId::ECHPF] = "Chorus Highpass Frequency (Hz)",
+    [Synth::ParamId::ECWET] = "Chorus Wet Volume (%)",
+    [Synth::ParamId::ECDRY] = "Chorus Dry Volume (%)",
+
     [Synth::ParamId::EEDEL] = "Echo Delay (s)",
     [Synth::ParamId::EEFB] = "Echo Feedback (%)",
     [Synth::ParamId::EEDF] = "Echo Dampening Frequency (Hz)",
@@ -412,6 +423,15 @@ char const* const GUI::PARAMS[] = {
     [Synth::ParamId::L7WAV] = "LFO 7 Waveform",
     [Synth::ParamId::L8WAV] = "LFO 8 Waveform",
 
+    [Synth::ParamId::L1CEN] = "LFO 1 Center",
+    [Synth::ParamId::L2CEN] = "LFO 2 Center",
+    [Synth::ParamId::L3CEN] = "LFO 3 Center",
+    [Synth::ParamId::L4CEN] = "LFO 4 Center",
+    [Synth::ParamId::L5CEN] = "LFO 5 Center",
+    [Synth::ParamId::L6CEN] = "LFO 6 Center",
+    [Synth::ParamId::L7CEN] = "LFO 7 Center",
+    [Synth::ParamId::L8CEN] = "LFO 8 Center",
+
     [Synth::ParamId::L1SYN] = "LFO 1 Tempo Synchronization",
     [Synth::ParamId::L2SYN] = "LFO 2 Tempo Synchronization",
     [Synth::ParamId::L3SYN] = "LFO 3 Tempo Synchronization",
@@ -420,6 +440,8 @@ char const* const GUI::PARAMS[] = {
     [Synth::ParamId::L6SYN] = "LFO 6 Tempo Synchronization",
     [Synth::ParamId::L7SYN] = "LFO 7 Tempo Synchronization",
     [Synth::ParamId::L8SYN] = "LFO 8 Tempo Synchronization",
+
+    [Synth::ParamId::ECSYN] = "Chorus Tempo Sync",
 
     [Synth::ParamId::EESYN] = "Echo Tempo Sync",
 
@@ -430,14 +452,12 @@ char const* const GUI::PARAMS[] = {
     [Synth::ParamId::EF1LOG] = "Effects Filter 1 Logarithmic Frequency",
     [Synth::ParamId::EF2LOG] = "Effects Filter 2 Logarithmic Frequency",
 
-    [Synth::ParamId::L1CEN] = "LFO 1 Center",
-    [Synth::ParamId::L2CEN] = "LFO 2 Center",
-    [Synth::ParamId::L3CEN] = "LFO 3 Center",
-    [Synth::ParamId::L4CEN] = "LFO 4 Center",
-    [Synth::ParamId::L5CEN] = "LFO 5 Center",
-    [Synth::ParamId::L6CEN] = "LFO 6 Center",
-    [Synth::ParamId::L7CEN] = "LFO 7 Center",
-    [Synth::ParamId::L8CEN] = "LFO 8 Center",
+    [Synth::ParamId::N1DYN] = "Envelope 1 Dynamic",
+    [Synth::ParamId::N2DYN] = "Envelope 2 Dynamic",
+    [Synth::ParamId::N3DYN] = "Envelope 3 Dynamic",
+    [Synth::ParamId::N4DYN] = "Envelope 4 Dynamic",
+    [Synth::ParamId::N5DYN] = "Envelope 5 Dynamic",
+    [Synth::ParamId::N6DYN] = "Envelope 6 Dynamic",
 };
 
 
@@ -596,11 +616,36 @@ constexpr GUI::Color GUI::rgb(
 
 const GUI::Color GUI::TEXT_COLOR = GUI::rgb(181, 181, 189);
 const GUI::Color GUI::TEXT_BACKGROUND = GUI::rgb(0, 0, 0);
-const GUI::Color GUI::TEXT_HIGHLIGHT_COLOR = GUI::rgb(225, 225, 235);
-const GUI::Color GUI::TEXT_HIGHLIGHT_BACKGROUND = GUI::rgb(63, 63, 66);
+const GUI::Color GUI::TEXT_HIGHLIGHT_COLOR = GUI::rgb(230, 230, 235);
+const GUI::Color GUI::TEXT_HIGHLIGHT_BACKGROUND = GUI::rgb(82, 82, 86);
 const GUI::Color GUI::STATUS_LINE_BACKGROUND = GUI::rgb(21, 21, 32);
 const GUI::Color GUI::TOGGLE_OFF_COLOR = GUI::rgb(0, 0, 0);
 const GUI::Color GUI::TOGGLE_ON_COLOR = GUI::rgb(150, 200, 230);
+
+
+const GUI::Color GUI::CTL_COLOR_NONE_TEXT = TEXT_COLOR;
+const GUI::Color GUI::CTL_COLOR_NONE_BG = TEXT_HIGHLIGHT_BACKGROUND;
+
+const GUI::Color GUI::CTL_COLOR_MIDI_CC_TEXT = GUI::rgb(255, 255, 120);
+const GUI::Color GUI::CTL_COLOR_MIDI_CC_BG = GUI::rgb(145, 145, 68);
+
+const GUI::Color GUI::CTL_COLOR_MIDI_SPECIAL_TEXT = GUI::rgb(255, 220, 150);
+const GUI::Color GUI::CTL_COLOR_MIDI_SPECIAL_BG = GUI::rgb(145, 125, 85);
+
+const GUI::Color GUI::CTL_COLOR_MIDI_LEARN_TEXT = GUI::rgb(90, 120, 230);
+const GUI::Color GUI::CTL_COLOR_MIDI_LEARN_BG = GUI::rgb(51, 68, 131);
+
+const GUI::Color GUI::CTL_COLOR_AFTERTOUCH_TEXT = GUI::rgb(255, 160, 110);
+const GUI::Color GUI::CTL_COLOR_AFTERTOUCH_BG = GUI::rgb(145, 91, 63);
+
+const GUI::Color GUI::CTL_COLOR_FLEX_TEXT = GUI::rgb(110, 190, 255);
+const GUI::Color GUI::CTL_COLOR_FLEX_BG = GUI::rgb(63, 108, 145);
+
+const GUI::Color GUI::CTL_COLOR_LFO_TEXT = GUI::rgb(230, 100, 255);
+const GUI::Color GUI::CTL_COLOR_LFO_BG = GUI::rgb(131, 57, 145);
+
+const GUI::Color GUI::CTL_COLOR_ENVELOPE_TEXT = GUI::rgb(110, 255, 150);
+const GUI::Color GUI::CTL_COLOR_ENVELOPE_BG = GUI::rgb(63, 145, 85);
 
 
 constexpr GUI::ColorComponent GUI::red(Color const color)
@@ -705,6 +750,110 @@ void GUI::param_ratio_to_str_int(
 Number GUI::clamp_ratio(Number const ratio)
 {
     return std::min(1.0, std::max(0.0, ratio));
+}
+
+
+GUI::Color GUI::controller_id_to_text_color(Synth::ControllerId const controller_id)
+{
+    switch (controller_id) {
+        case Synth::ControllerId::NONE:
+            return CTL_COLOR_NONE_TEXT;
+
+        case Synth::ControllerId::PITCH_WHEEL:
+        case Synth::ControllerId::NOTE:
+        case Synth::ControllerId::VELOCITY:
+            return CTL_COLOR_MIDI_SPECIAL_TEXT;
+
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_1:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_2:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_3:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_4:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_5:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_6:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_7:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_8:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_9:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_10:
+            return CTL_COLOR_FLEX_TEXT;
+
+        case Synth::ControllerId::LFO_1:
+        case Synth::ControllerId::LFO_2:
+        case Synth::ControllerId::LFO_3:
+        case Synth::ControllerId::LFO_4:
+        case Synth::ControllerId::LFO_5:
+        case Synth::ControllerId::LFO_6:
+        case Synth::ControllerId::LFO_7:
+        case Synth::ControllerId::LFO_8:
+            return CTL_COLOR_LFO_TEXT;
+
+        case Synth::ControllerId::ENVELOPE_1:
+        case Synth::ControllerId::ENVELOPE_2:
+        case Synth::ControllerId::ENVELOPE_3:
+        case Synth::ControllerId::ENVELOPE_4:
+        case Synth::ControllerId::ENVELOPE_5:
+        case Synth::ControllerId::ENVELOPE_6:
+            return CTL_COLOR_ENVELOPE_TEXT;
+
+        case Synth::ControllerId::CHANNEL_PRESSURE:
+            return CTL_COLOR_AFTERTOUCH_TEXT;
+
+        case Synth::ControllerId::MIDI_LEARN:
+            return CTL_COLOR_MIDI_LEARN_TEXT;
+
+        default: return CTL_COLOR_MIDI_CC_TEXT;
+    };
+}
+
+
+GUI::Color GUI::controller_id_to_bg_color(Synth::ControllerId const controller_id)
+{
+    switch (controller_id) {
+        case Synth::ControllerId::NONE:
+            return CTL_COLOR_NONE_BG;
+
+        case Synth::ControllerId::PITCH_WHEEL:
+        case Synth::ControllerId::NOTE:
+        case Synth::ControllerId::VELOCITY:
+            return CTL_COLOR_MIDI_SPECIAL_BG;
+
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_1:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_2:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_3:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_4:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_5:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_6:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_7:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_8:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_9:
+        case Synth::ControllerId::FLEXIBLE_CONTROLLER_10:
+            return CTL_COLOR_FLEX_BG;
+
+        case Synth::ControllerId::LFO_1:
+        case Synth::ControllerId::LFO_2:
+        case Synth::ControllerId::LFO_3:
+        case Synth::ControllerId::LFO_4:
+        case Synth::ControllerId::LFO_5:
+        case Synth::ControllerId::LFO_6:
+        case Synth::ControllerId::LFO_7:
+        case Synth::ControllerId::LFO_8:
+            return CTL_COLOR_LFO_BG;
+
+        case Synth::ControllerId::ENVELOPE_1:
+        case Synth::ControllerId::ENVELOPE_2:
+        case Synth::ControllerId::ENVELOPE_3:
+        case Synth::ControllerId::ENVELOPE_4:
+        case Synth::ControllerId::ENVELOPE_5:
+        case Synth::ControllerId::ENVELOPE_6:
+            return CTL_COLOR_ENVELOPE_BG;
+
+        case Synth::ControllerId::CHANNEL_PRESSURE:
+            return CTL_COLOR_AFTERTOUCH_BG;
+
+        case Synth::ControllerId::MIDI_LEARN:
+            return CTL_COLOR_MIDI_LEARN_BG;
+
+        default: return CTL_COLOR_MIDI_CC_BG;
+    };
 }
 
 
@@ -1041,23 +1190,35 @@ void GUI::build_effects_body(ParamEditorKnobStates* knob_states)
     PE(effects_body, 690 + PE_W * 3,    57, Synth::ParamId::EF2G,   MFL_C,      "%.2f", 1.0, knob_states);
     TS(effects_body, 764, 29, 90, 0, Synth::ParamId::EF2LOG);
 
-    PE(effects_body, 258 + PE_W * 0,   242, Synth::ParamId::EEDEL,  MFL__,      "%.3f", 1.0, knob_states);
-    PE(effects_body, 258 + PE_W * 1,   242, Synth::ParamId::EEFB,   MFL_C,      "%.2f", 100.0, knob_states);
-    PE(effects_body, 258 + PE_W * 2,   242, Synth::ParamId::EEDF,   MFL__,      "%.1f", 1.0, knob_states);
-    PE(effects_body, 258 + PE_W * 3,   242, Synth::ParamId::EEDG,   MFL_C,      "%.2f", 1.0, knob_states);
-    PE(effects_body, 258 + PE_W * 4,   242, Synth::ParamId::EEWID,  MFL_C,      "%.2f", 100.0, knob_states);
-    PE(effects_body, 258 + PE_W * 5,   242, Synth::ParamId::EEHPF,  MFL__,      "%.1f", 1.0, knob_states);
-    PE(effects_body, 258 + PE_W * 6,   242, Synth::ParamId::EEWET,  MFL_C,      "%.2f", 100.0, knob_states);
-    PE(effects_body, 258 + PE_W * 7,   242, Synth::ParamId::EEDRY,  MFL_C,      "%.2f", 100.0, knob_states);
-    TS(effects_body, 612, 215, 111, 87, Synth::ParamId::EESYN);
+    PE(effects_body, 200 + PE_W * 0,   242, Synth::ParamId::ECDEL,  MFL__,      "%.4f", 1.0, knob_states);
+    PE(effects_body, 200 + PE_W * 1,   242, Synth::ParamId::ECFRQ,  MFL_C,      "%.3f", 1.0, knob_states);
+    PE(effects_body, 200 + PE_W * 2,   242, Synth::ParamId::ECDPT,  MFL_C,      "%.2f", 100.0, knob_states);
+    PE(effects_body, 200 + PE_W * 3,   242, Synth::ParamId::ECFB,   MFL_C,      "%.2f", 100.0 * (Number)Constants::CHORUS_FEEDBACK_SCALE, knob_states);
+    PE(effects_body, 200 + PE_W * 4,   242, Synth::ParamId::ECDF,   MFL__,      "%.1f", 1.0, knob_states);
+    PE(effects_body, 200 + PE_W * 5,   242, Synth::ParamId::ECDG,   MFL_C,      "%.2f", 1.0, knob_states);
+    PE(effects_body, 200 + PE_W * 6,   242, Synth::ParamId::ECWID,  MFL_C,      "%.2f", 100.0, knob_states);
+    PE(effects_body, 200 + PE_W * 7,   242, Synth::ParamId::ECHPF,  MFL__,      "%.1f", 1.0, knob_states);
+    PE(effects_body, 200 + PE_W * 8,   242, Synth::ParamId::ECWET,  MFL_C,      "%.2f", 100.0, knob_states);
+    PE(effects_body, 200 + PE_W * 9,   242, Synth::ParamId::ECDRY,  MFL_C,      "%.2f", 100.0, knob_states);
+    TS(effects_body, 670, 215, 111, 87, Synth::ParamId::ECSYN);
 
-    PE(effects_body, 287 + PE_W * 0,   428, Synth::ParamId::ERRS,   MFL_C,      "%.2f", 100.0, knob_states);
-    PE(effects_body, 287 + PE_W * 1,   428, Synth::ParamId::ERDF,   MFL__,      "%.1f", 1.0, knob_states);
-    PE(effects_body, 287 + PE_W * 2,   428, Synth::ParamId::ERDG,   MFL_C,      "%.2f", 1.0, knob_states);
-    PE(effects_body, 287 + PE_W * 3,   428, Synth::ParamId::ERWID,  MFL_C,      "%.2f", 100.0, knob_states);
-    PE(effects_body, 287 + PE_W * 4,   428, Synth::ParamId::ERHPF,  MFL__,      "%.1f", 1.0, knob_states);
-    PE(effects_body, 287 + PE_W * 5,   428, Synth::ParamId::ERWET,  MFL_C,      "%.2f", 100.0, knob_states);
-    PE(effects_body, 287 + PE_W * 6,   428, Synth::ParamId::ERDRY,  MFL_C,      "%.2f", 100.0, knob_states);
+    PE(effects_body,  34 + PE_W * 0,   428, Synth::ParamId::EEDEL,  MFL__,      "%.3f", 1.0, knob_states);
+    PE(effects_body,  34 + PE_W * 1,   428, Synth::ParamId::EEFB,   MFL_C,      "%.2f", 100.0, knob_states);
+    PE(effects_body,  34 + PE_W * 2,   428, Synth::ParamId::EEDF,   MFL__,      "%.1f", 1.0, knob_states);
+    PE(effects_body,  34 + PE_W * 3,   428, Synth::ParamId::EEDG,   MFL_C,      "%.2f", 1.0, knob_states);
+    PE(effects_body,  34 + PE_W * 4,   428, Synth::ParamId::EEWID,  MFL_C,      "%.2f", 100.0, knob_states);
+    PE(effects_body,  34 + PE_W * 5,   428, Synth::ParamId::EEHPF,  MFL__,      "%.1f", 1.0, knob_states);
+    PE(effects_body,  34 + PE_W * 6,   428, Synth::ParamId::EEWET,  MFL_C,      "%.2f", 100.0, knob_states);
+    PE(effects_body,  34 + PE_W * 7,   428, Synth::ParamId::EEDRY,  MFL_C,      "%.2f", 100.0, knob_states);
+    TS(effects_body, 388, 401, 111, 87, Synth::ParamId::EESYN);
+
+    PE(effects_body, 540 + PE_W * 0,   428, Synth::ParamId::ERRS,   MFL_C,      "%.2f", 100.0, knob_states);
+    PE(effects_body, 540 + PE_W * 1,   428, Synth::ParamId::ERDF,   MFL__,      "%.1f", 1.0, knob_states);
+    PE(effects_body, 540 + PE_W * 2,   428, Synth::ParamId::ERDG,   MFL_C,      "%.2f", 1.0, knob_states);
+    PE(effects_body, 540 + PE_W * 3,   428, Synth::ParamId::ERWID,  MFL_C,      "%.2f", 100.0, knob_states);
+    PE(effects_body, 540 + PE_W * 4,   428, Synth::ParamId::ERHPF,  MFL__,      "%.1f", 1.0, knob_states);
+    PE(effects_body, 540 + PE_W * 5,   428, Synth::ParamId::ERWET,  MFL_C,      "%.2f", 100.0, knob_states);
+    PE(effects_body, 540 + PE_W * 6,   428, Synth::ParamId::ERDRY,  MFL_C,      "%.2f", 100.0, knob_states);
 
     effects_body->hide();
 }
@@ -1081,6 +1242,8 @@ void GUI::build_envelopes_body(ParamEditorKnobStates* knob_states)
     PE(envelopes_body,  37 + PE_W * 3, 164, Synth::ParamId::N1DEC,  MF___,     "%.3f", 1.0, knob_states);
     PE(envelopes_body,  37 + PE_W * 4, 164, Synth::ParamId::N1REL,  MF___,     "%.3f", 1.0, knob_states);
 
+    TS(envelopes_body, 235,  16, 92, 71, Synth::ParamId::N1DYN);
+
 
     PE(envelopes_body, 343 + PE_W * 0,  44, Synth::ParamId::N2AMT,  MF___,     "%.2f", 100.0, knob_states);
     PE(envelopes_body, 343 + PE_W * 1,  44, Synth::ParamId::N2INI,  MF___,     "%.2f", 100.0, knob_states);
@@ -1093,6 +1256,8 @@ void GUI::build_envelopes_body(ParamEditorKnobStates* knob_states)
     PE(envelopes_body, 343 + PE_W * 2, 164, Synth::ParamId::N2HLD,  MF___,     "%.3f", 1.0, knob_states);
     PE(envelopes_body, 343 + PE_W * 3, 164, Synth::ParamId::N2DEC,  MF___,     "%.3f", 1.0, knob_states);
     PE(envelopes_body, 343 + PE_W * 4, 164, Synth::ParamId::N2REL,  MF___,     "%.3f", 1.0, knob_states);
+
+    TS(envelopes_body, 541,  16, 92, 71, Synth::ParamId::N2DYN);
 
 
     PE(envelopes_body, 649 + PE_W * 0,  44, Synth::ParamId::N3AMT,  MF___,     "%.2f", 100.0, knob_states);
@@ -1107,6 +1272,8 @@ void GUI::build_envelopes_body(ParamEditorKnobStates* knob_states)
     PE(envelopes_body, 649 + PE_W * 3, 164, Synth::ParamId::N3DEC,  MF___,     "%.3f", 1.0, knob_states);
     PE(envelopes_body, 649 + PE_W * 4, 164, Synth::ParamId::N3REL,  MF___,     "%.3f", 1.0, knob_states);
 
+    TS(envelopes_body, 847,  16, 92, 71, Synth::ParamId::N3DYN);
+
 
     PE(envelopes_body,  37 + PE_W * 0, 324, Synth::ParamId::N4AMT,  MF___,     "%.2f", 100.0, knob_states);
     PE(envelopes_body,  37 + PE_W * 1, 324, Synth::ParamId::N4INI,  MF___,     "%.2f", 100.0, knob_states);
@@ -1119,6 +1286,8 @@ void GUI::build_envelopes_body(ParamEditorKnobStates* knob_states)
     PE(envelopes_body,  37 + PE_W * 2, 444, Synth::ParamId::N4HLD,  MF___,     "%.3f", 1.0, knob_states);
     PE(envelopes_body,  37 + PE_W * 3, 444, Synth::ParamId::N4DEC,  MF___,     "%.3f", 1.0, knob_states);
     PE(envelopes_body,  37 + PE_W * 4, 444, Synth::ParamId::N4REL,  MF___,     "%.3f", 1.0, knob_states);
+
+    TS(envelopes_body, 235, 296, 92, 71, Synth::ParamId::N4DYN);
 
 
     PE(envelopes_body, 343 + PE_W * 0, 324, Synth::ParamId::N5AMT,  MF___,     "%.2f", 100.0, knob_states);
@@ -1133,6 +1302,8 @@ void GUI::build_envelopes_body(ParamEditorKnobStates* knob_states)
     PE(envelopes_body, 343 + PE_W * 3, 444, Synth::ParamId::N5DEC,  MF___,     "%.3f", 1.0, knob_states);
     PE(envelopes_body, 343 + PE_W * 4, 444, Synth::ParamId::N5REL,  MF___,     "%.3f", 1.0, knob_states);
 
+    TS(envelopes_body, 541, 296, 92, 71, Synth::ParamId::N5DYN);
+
 
     PE(envelopes_body, 649 + PE_W * 0, 324, Synth::ParamId::N6AMT,  MF___,     "%.2f", 100.0, knob_states);
     PE(envelopes_body, 649 + PE_W * 1, 324, Synth::ParamId::N6INI,  MF___,     "%.2f", 100.0, knob_states);
@@ -1145,6 +1316,8 @@ void GUI::build_envelopes_body(ParamEditorKnobStates* knob_states)
     PE(envelopes_body, 649 + PE_W * 2, 444, Synth::ParamId::N6HLD,  MF___,     "%.3f", 1.0, knob_states);
     PE(envelopes_body, 649 + PE_W * 3, 444, Synth::ParamId::N6DEC,  MF___,     "%.3f", 1.0, knob_states);
     PE(envelopes_body, 649 + PE_W * 4, 444, Synth::ParamId::N6REL,  MF___,     "%.3f", 1.0, knob_states);
+
+    TS(envelopes_body, 847, 296, 92, 71, Synth::ParamId::N6DYN);
 
     envelopes_body->hide();
 }

@@ -21,12 +21,10 @@
 
 #include "js80p.hpp"
 
-#include "synth/biquad_filter.cpp"
-#include "synth/comb_filter.cpp"
-#include "synth/delay.cpp"
 #include "synth/envelope.cpp"
 #include "synth/filter.cpp"
 #include "synth/flexible_controller.cpp"
+#include "synth/gain.cpp"
 #include "synth/lfo.cpp"
 #include "synth/math.cpp"
 #include "synth/midi_controller.cpp"
@@ -43,51 +41,49 @@ using namespace JS80P;
 constexpr Integer CHANNELS = 2;
 
 
-TEST(output_may_be_panned, {
-    constexpr Integer block_size = 5;
+// TODO: the gain of the Delay-s in the Chorus should be constant 1, and the feedback of the chorus should be a Gain<HighShelf>, and ECFB should control the gain of this!
+
+
+TEST(multiplies_input_signals_by_the_value_of_the_gain_parameter, {
     constexpr Integer rounds = 2;
+    constexpr Integer block_size = 5;
     constexpr Integer sample_count = rounds * block_size;
     constexpr Frequency sample_rate = 10.0;
     constexpr Sample input_samples[CHANNELS][block_size] = {
-        {0.10, 0.20, 0.30, 0.40, 0.50},
-        {0.20, 0.40, 0.60, 0.80, 1.00},
+        {0.01, 0.02, 0.03, 0.04, 0.05},
+        {0.02, 0.04, 0.06, 0.08, 0.10},
     };
     constexpr Sample expected_output[CHANNELS][sample_count] = {
-        {0.000, 0.000, 0.075, 0.150, 0.225, 0.000, 0.000, 0.000, 0.000, 0.000},
-        {0.000, 0.000, 0.150, 0.300, 0.450, 0.900, 1.125, 0.225, 0.450, 0.675},
+        {0.10, 0.20, 0.30, 0.40, 0.50, 0.02, 0.04, 0.06, 0.08, 0.10},
+        {0.20, 0.40, 0.60, 0.80, 1.00, 0.04, 0.08, 0.12, 0.16, 0.20},
     };
     Sample const* input_buffer[CHANNELS] = {
         (Sample const*)&input_samples[0],
         (Sample const*)&input_samples[1]
     };
     FixedSignalProducer input(input_buffer);
-    Buffer output(sample_count, CHANNELS);
-    CombFilter<FixedSignalProducer> comb_filter(
-        input, CombFilter<FixedSignalProducer>::StereoMode::FLIPPED
-    );
+    FloatParam gain_param("", 0.0, 20.0, 0.12345);
+    Gain<FixedSignalProducer> gain(input, gain_param);
+    Buffer actual_output(sample_count, CHANNELS);
 
     input.set_sample_rate(sample_rate);
     input.set_block_size(block_size);
 
-    comb_filter.set_sample_rate(sample_rate);
-    comb_filter.set_block_size(block_size);
-    comb_filter.delay.gain.set_value(0.75);
-    comb_filter.delay.time.set_value(0.2);
-    comb_filter.panning.set_value(0.0);
-    comb_filter.panning.schedule_value(0.45, -1.0);
+    gain_param.set_sample_rate(sample_rate);
+    gain_param.set_block_size(block_size);
 
-    render_rounds< CombFilter<FixedSignalProducer> >(comb_filter, output, rounds);
+    gain.set_sample_rate(sample_rate);
+    gain.set_block_size(block_size);
 
-    for (Integer c = 0; c != CHANNELS; ++c) {
-        assert_eq(
-            expected_output[c],
-            output.samples[c],
-            sample_count,
-            DOUBLE_DELTA,
-            "channel=%d",
-            (int)c
-        );
-    }
+    gain_param.set_value(10.0);
+    gain_param.schedule_value(0.45, 2.0);
 
-    assert_eq(-1.0, comb_filter.panning.get_value(), DOUBLE_DELTA);
+    render_rounds< Gain<FixedSignalProducer> >(gain, actual_output, rounds);
+
+    assert_eq(
+        expected_output[0], actual_output.samples[0], sample_count, DOUBLE_DELTA
+    );
+    assert_eq(
+        expected_output[1], actual_output.samples[1], sample_count, DOUBLE_DELTA
+    );
 })

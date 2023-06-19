@@ -19,6 +19,7 @@
 #include "test.cpp"
 #include "utils.cpp"
 
+#include <cstring>
 #include <vector>
 
 #include "js80p.hpp"
@@ -168,4 +169,119 @@ TEST(when_lfo_is_centered_then_it_oscillates_around_the_center_point_between_min
     assert_eq(
         expected_output.samples[0], actual_output.samples[0], sample_count, 0.001
     );
+})
+
+
+TEST(lfo_performance, {
+    /*
+    Usage: ./build/x86_64-gpp/test_lfo-scale lfo_performance ON|OFF number-of-samples-to-render
+    */
+    LFO lfo("L1");
+
+    if (TEST_ARGV.size() < 3) {
+        return;
+    }
+
+    Integer const rounds = atoi(TEST_ARGV.back().c_str());
+
+    assert_gt((int)rounds, 0, "Number of rounds to render must be positive");
+
+    TEST_ARGV.pop_back();
+
+    std::string const center = TEST_ARGV.back();
+
+    if (center == "ON") {
+        lfo.center.set_value(ToggleParam::ON);
+    } else if (center == "OFF") {
+        lfo.center.set_value(ToggleParam::OFF);
+    } else {
+        assert_true(
+            false,
+            "Unknown setting for LFO::center: \"%s\" - must be \"ON\" or \"OFF\"\n",
+            TEST_ARGV[2]
+        );
+    }
+
+    lfo.set_block_size(BLOCK_SIZE);
+    lfo.set_sample_rate(SAMPLE_RATE);
+    lfo.amount.set_value(0.99);
+    lfo.amount.schedule_linear_ramp(5.0, 1.0);
+
+    Number const total_sample_count = (Number)(BLOCK_SIZE * rounds);
+
+    Integer number_of_rendered_samples = 0;
+    Number sum = 0.0;
+
+    for (Integer round = 0; round != rounds; ++round) {
+        Sample const* const* const rendered_samples = (
+            SignalProducer::produce<LFO>(&lfo, round)
+        );
+        number_of_rendered_samples += BLOCK_SIZE;
+
+        for (Integer i = 0; i != BLOCK_SIZE; ++i) {
+            sum += rendered_samples[0][i];
+        }
+    }
+
+    assert_lt(-100000.0, sum / total_sample_count);
+})
+
+
+void test_lfo_modifier_statistics(
+        Number const distortion,
+        Number const randomness,
+        Toggle const centered,
+        Number const tolerance
+) {
+    LFO lfo("L1");
+    std::vector<Number> numbers;
+    Sample const* const* rendered_samples;
+    Math::Statistics stats;
+    char message[128];
+
+    snprintf(
+        message,
+        128,
+        "distortion=%f, randomness=%f, centered=%s",
+        distortion,
+        randomness,
+        centered == ToggleParam::ON ? "ON" : "OFF"
+    );
+
+    lfo.set_block_size(BLOCK_SIZE);
+    lfo.set_sample_rate(SAMPLE_RATE);
+    lfo.waveform.set_value(LFO::Oscillator_::TRIANGLE);
+    lfo.min.set_value(0.25);
+    lfo.max.set_value(0.75);
+    lfo.distortion.set_value(distortion);
+    lfo.distortion.set_value(randomness);
+    lfo.frequency.set_value(30.0);
+    lfo.center.set_value(centered);
+    lfo.start(0.0);
+
+    rendered_samples = SignalProducer::produce<LFO>(&lfo, 1);
+
+    numbers.reserve(BLOCK_SIZE);
+
+    for (Integer i = 0; i != BLOCK_SIZE; ++i) {
+        numbers.push_back(rendered_samples[0][i]);
+    }
+
+    Math::compute_statistics(numbers, stats);
+
+    assert_statistics(true, 0.25, 0.5, 0.75, 0.5, 0.125, stats, tolerance, message);
+    assert_gte(0.75, stats.max);
+    assert_lte(0.25, stats.min);
+}
+
+
+TEST(distortion_and_randomness_respect_min_and_max_values, {
+    test_lfo_modifier_statistics(0.0, 0.0, ToggleParam::OFF, 0.02);
+    test_lfo_modifier_statistics(1.0, 0.0, ToggleParam::OFF, 0.02);
+    test_lfo_modifier_statistics(0.0, 1.0, ToggleParam::OFF, 0.14);
+    test_lfo_modifier_statistics(1.0, 1.0, ToggleParam::OFF, 0.14);
+    test_lfo_modifier_statistics(0.0, 0.0, ToggleParam::ON, 0.02);
+    test_lfo_modifier_statistics(1.0, 0.0, ToggleParam::ON, 0.02);
+    test_lfo_modifier_statistics(0.0, 1.0, ToggleParam::ON, 0.14);
+    test_lfo_modifier_statistics(1.0, 1.0, ToggleParam::ON, 0.14);
 })

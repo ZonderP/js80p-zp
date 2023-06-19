@@ -22,7 +22,7 @@
 #include "js80p.hpp"
 
 #include "synth/biquad_filter.hpp"
-#include "synth/comb_filter.hpp"
+#include "synth/delay.hpp"
 #include "synth/effect.hpp"
 #include "synth/param.hpp"
 #include "synth/signal_producer.hpp"
@@ -37,9 +37,9 @@ class Echo : public Effect<InputSignalProducerClass>
     friend class SignalProducer;
 
     public:
-        typedef BiquadFilter<InputSignalProducerClass> HighPassInput;
-        typedef CombFilter<HighPassInput> CombFilter1;
-        typedef CombFilter< HighShelfDelay<HighPassInput> > CombFilter2;
+        typedef BiquadFilter<InputSignalProducerClass> HighPassedInput;
+        typedef HighShelfPannedDelay<HighPassedInput> CombFilter1;
+        typedef HighShelfPannedDelay< HighShelfDelay<HighPassedInput> > CombFilter2;
 
         Echo(std::string const name, InputSignalProducerClass& input);
 
@@ -65,11 +65,11 @@ class Echo : public Effect<InputSignalProducerClass>
         ) noexcept;
 
     private:
-        typename BiquadFilter<InputSignalProducerClass>::TypeParam high_pass_filter_type;
+        typename HighPassedInput::TypeParam high_pass_filter_type;
         FloatParam high_pass_filter_q;
         FloatParam high_pass_filter_gain;
 
-        BiquadFilter<InputSignalProducerClass> high_pass_filter;
+        HighPassedInput high_pass_filter;
         CombFilter1 comb_filter_1;
         CombFilter2 comb_filter_2;
 

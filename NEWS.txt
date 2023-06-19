@@ -1,18 +1,74 @@
-v1.5.0 (2023-06-??)
+v1.7.3 (2023-06-18)
+ * Highlight different controller types with different colors
+ * New presets:
+    * Ambient Pad 1
+    * Ambient Pad 2
+    * Ambient Pad 3
+    * Saw Piano
+    * Saw Piano Reversed
+
+v1.7.2 (2023-06-17)
+ * Bugfix: centered LFOs will now handle distortion and randomness correctly.
+
+v1.7.1 (2023-06-17)
+ * FST: reduce CPU usage of host UI parameter updates due to MIDI Control
+   Change (CC) events
+
+v1.7.0 (2023-06-16)
+ * New effect: chorus
+ * New preset: derezzed
+ * Bugfix: LFO distortion and randomness now have effect again, and the min,
+   max, amount, etc. range settings are respected.
+
+v1.6.0 (2023-06-11)
+ * Envelopes can now be configured to affect notes that are already sounding.
+ * New presets:
+    * Acid Lead 1
+    * Acid Lead 2
+    * Acid Lead 3
+    * Bells 1
+    * Bells 2
+    * Flute
+    * FM Womp 1
+    * FM Womp 2
+    * FM Womp 3
+    * Tech Noir Lead 1
+    * Tech Noir Lead 2
+    * Tech Noir Lead 3
+ * Bugfix: LFOs now respect min, max, amount, etc. range settings when
+   distortion and randomness are in use.
+
+v1.5.1 (2023-06-07)
+ * Bugfix: eliminate noise in FL Studio when the delay time for the Echo effect
+   is set to extremely low values (few milliseconds).
+
+v1.5.0 (2023-06-06)
  * Improved MIDI CC smoothing
  * Parameters can now be controlled via Channel Aftertouch (Channel Pressure).
  * With the help of Patrik Ehringer (ZonderP), program and bank management is
    implemented, and presets are accessible via the host application, without
    having to browse the file system.
- * The FST plugin now exports its MIDI CC input as host-automatable parameters,
-   just like the VST3 version.
+ * The FST plugin now exports its MIDI Control Change (MIDI CC) inputs as
+   host-automatable parameters, just like the VST3 version does.
+ * MIDI Learn now listens for changes in these new MIDI CC proxy parameters
+   as well, which is useful for hosts that refuse to send the raw MIDI CC
+   events to plugins, but allow automating parameters via MIDI CC. One
+   example of such a host is FL Studio which only sends the modulation wheel's
+   MIDI CC messages as actual MIDI CC data, and forces users to manually assign
+   all other MIDI CC events to plugin parameters.
  * LFOs can now oscillate around the midpoint between the minimum and maximum
    value.
+ * New presets: kalimba.js80p, chariots-aftertouch.js80p
+ * Presets that have both pitch bends and vibrato now use LFO centering so that
+   they won't go out of tune.
  * Bugfix: the VST3 plugin will now process all controller changes within a
    block, not just the last one
  * Bugfix: make sure that before a patch (or program or bank) is imported, all
    parameter controllers are released, and all scheduled parameter values are
    cleared, so that they will not override the imported values.
+ * Bugfix: unlike the Fine Detune parameter, the Detune parameter should not
+   be smoothed when it has a MIDI Controller or a Flexible Controller assigned
+   to it.
 
 v1.4.0 (2023-05-20)
  * MIDI Learn: assign this special controller to a parameter, then move a

@@ -46,6 +46,15 @@ class LFO : public SignalProducer
 
         LFO(std::string const name) noexcept;
 
+        LFO(
+            std::string const name,
+            FloatParam& frequency_leader,
+            FloatParam& max_leader,
+            FloatParam& amount_leader,
+            ToggleParam& tempo_sync_,
+            Number const phase_offset
+        ) noexcept;
+
         void start(Seconds const time_offset) noexcept;
         void stop(Seconds const time_offset) noexcept;
         bool is_on() const noexcept;
@@ -80,25 +89,38 @@ class LFO : public SignalProducer
         ) noexcept;
 
     private:
+        void initialize_instance() noexcept;
+
+        void apply_distortions(
+            Integer const round,
+            Integer const first_sample_index,
+            Integer const last_sample_index,
+            Sample const* source_buffer,
+            Sample* target_buffer
+        );
+
         void apply_range(
             Integer const round,
             Integer const first_sample_index,
             Integer const last_sample_index,
-            Sample** buffer
+            Sample const* source_buffer,
+            Sample* target_buffer
+        );
+
+        void apply_distortions_centered(
+            Integer const round,
+            Integer const first_sample_index,
+            Integer const last_sample_index,
+            Sample const* source_buffer,
+            Sample* target_buffer
         );
 
         void apply_range_centered(
             Integer const round,
             Integer const first_sample_index,
             Integer const last_sample_index,
-            Sample** buffer
-        );
-
-        void apply_distortions(
-            Integer const round,
-            Integer const first_sample_index,
-            Integer const last_sample_index,
-            Sample** buffer
+            Sample const* source_buffer,
+            Sample* target_buffer
         );
 
         Oscillator_ oscillator;

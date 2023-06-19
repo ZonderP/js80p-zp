@@ -28,7 +28,7 @@
 #include "synth.hpp"
 
 #include "synth/biquad_filter.cpp"
-#include "synth/comb_filter.cpp"
+#include "synth/chorus.cpp"
 #include "synth/delay.cpp"
 #include "synth/distortion.cpp"
 #include "synth/echo.cpp"
@@ -37,9 +37,11 @@
 #include "synth/envelope.cpp"
 #include "synth/filter.cpp"
 #include "synth/flexible_controller.cpp"
+#include "synth/gain.cpp"
 #include "synth/lfo.cpp"
 #include "synth/math.cpp"
 #include "synth/midi_controller.cpp"
+#include "synth/mixer.cpp"
 #include "synth/oscillator.cpp"
 #include "synth/param.cpp"
 #include "synth/reverb.cpp"
@@ -172,74 +174,74 @@ void Synth::initialize_supported_midi_controllers() noexcept
 
     supported_midi_controllers_initialized = true;
 
-    Synth::supported_midi_controllers[Synth::ControllerId::MODULATION_WHEEL] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::BREATH] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_1] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::FOOT_PEDAL] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::PORTAMENTO_TIME] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::VOLUME] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::BALANCE] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_2] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::PAN] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::EXPRESSION_PEDAL] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::FX_CTL_1] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::FX_CTL_2] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_3] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_4] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::GENERAL_1] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::GENERAL_2] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::GENERAL_3] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::GENERAL_4] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_5] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_6] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_7] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_8] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_9] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_10] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_11] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_12] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_13] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_14] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_15] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_16] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::SOUND_1] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::SOUND_2] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::SOUND_3] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::SOUND_4] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::SOUND_5] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::SOUND_6] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::SOUND_7] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::SOUND_8] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::SOUND_9] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::SOUND_10] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_17] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_18] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_19] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_20] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_21] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::FX_1] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::FX_2] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::FX_3] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::FX_4] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::FX_5] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_22] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_23] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_24] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_25] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_26] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_27] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_28] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_29] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_30] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_31] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_32] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_33] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_34] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_35] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_36] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_37] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_38] = true;
-    Synth::supported_midi_controllers[Synth::ControllerId::UNDEFINED_39] = true;
+    supported_midi_controllers[ControllerId::MODULATION_WHEEL] = true;
+    supported_midi_controllers[ControllerId::BREATH] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_1] = true;
+    supported_midi_controllers[ControllerId::FOOT_PEDAL] = true;
+    supported_midi_controllers[ControllerId::PORTAMENTO_TIME] = true;
+    supported_midi_controllers[ControllerId::VOLUME] = true;
+    supported_midi_controllers[ControllerId::BALANCE] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_2] = true;
+    supported_midi_controllers[ControllerId::PAN] = true;
+    supported_midi_controllers[ControllerId::EXPRESSION_PEDAL] = true;
+    supported_midi_controllers[ControllerId::FX_CTL_1] = true;
+    supported_midi_controllers[ControllerId::FX_CTL_2] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_3] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_4] = true;
+    supported_midi_controllers[ControllerId::GENERAL_1] = true;
+    supported_midi_controllers[ControllerId::GENERAL_2] = true;
+    supported_midi_controllers[ControllerId::GENERAL_3] = true;
+    supported_midi_controllers[ControllerId::GENERAL_4] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_5] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_6] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_7] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_8] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_9] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_10] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_11] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_12] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_13] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_14] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_15] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_16] = true;
+    supported_midi_controllers[ControllerId::SOUND_1] = true;
+    supported_midi_controllers[ControllerId::SOUND_2] = true;
+    supported_midi_controllers[ControllerId::SOUND_3] = true;
+    supported_midi_controllers[ControllerId::SOUND_4] = true;
+    supported_midi_controllers[ControllerId::SOUND_5] = true;
+    supported_midi_controllers[ControllerId::SOUND_6] = true;
+    supported_midi_controllers[ControllerId::SOUND_7] = true;
+    supported_midi_controllers[ControllerId::SOUND_8] = true;
+    supported_midi_controllers[ControllerId::SOUND_9] = true;
+    supported_midi_controllers[ControllerId::SOUND_10] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_17] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_18] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_19] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_20] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_21] = true;
+    supported_midi_controllers[ControllerId::FX_1] = true;
+    supported_midi_controllers[ControllerId::FX_2] = true;
+    supported_midi_controllers[ControllerId::FX_3] = true;
+    supported_midi_controllers[ControllerId::FX_4] = true;
+    supported_midi_controllers[ControllerId::FX_5] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_22] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_23] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_24] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_25] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_26] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_27] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_28] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_29] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_30] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_31] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_32] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_33] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_34] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_35] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_36] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_37] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_38] = true;
+    supported_midi_controllers[ControllerId::UNDEFINED_39] = true;
 }
 
 
@@ -362,6 +364,18 @@ void Synth::register_effects_params() noexcept
     register_float_param(ParamId::EF2Q, effects.filter_2.q);
     register_float_param(ParamId::EF2G, effects.filter_2.gain);
 
+    register_float_param(ParamId::ECDEL, effects.chorus.delay_time);
+    register_float_param(ParamId::ECFRQ, effects.chorus.frequency);
+    register_float_param(ParamId::ECDPT, effects.chorus.depth);
+    register_float_param(ParamId::ECFB, effects.chorus.feedback);
+    register_float_param(ParamId::ECDF, effects.chorus.damping_frequency);
+    register_float_param(ParamId::ECDG, effects.chorus.damping_gain);
+    register_float_param(ParamId::ECWID, effects.chorus.width);
+    register_float_param(ParamId::ECHPF, effects.chorus.high_pass_frequency);
+    register_float_param(ParamId::ECWET, effects.chorus.wet);
+    register_float_param(ParamId::ECDRY, effects.chorus.dry);
+    register_param<ToggleParam>(ParamId::ECSYN, effects.chorus.tempo_sync);
+
     register_float_param(ParamId::EEDEL, effects.echo.delay_time);
     register_float_param(ParamId::EEFB, effects.echo.feedback);
     register_float_param(ParamId::EEDF, effects.echo.damping_frequency);
@@ -467,6 +481,13 @@ void Synth::create_envelopes() noexcept
         register_float_param_as_child((ParamId)next_id++, envelope->release_time);
         register_float_param_as_child((ParamId)next_id++, envelope->final_value);
     }
+
+    register_param_as_child<ToggleParam>(ParamId::N1DYN, envelopes_rw[0]->dynamic);
+    register_param_as_child<ToggleParam>(ParamId::N2DYN, envelopes_rw[1]->dynamic);
+    register_param_as_child<ToggleParam>(ParamId::N3DYN, envelopes_rw[2]->dynamic);
+    register_param_as_child<ToggleParam>(ParamId::N4DYN, envelopes_rw[3]->dynamic);
+    register_param_as_child<ToggleParam>(ParamId::N5DYN, envelopes_rw[4]->dynamic);
+    register_param_as_child<ToggleParam>(ParamId::N6DYN, envelopes_rw[5]->dynamic);
 }
 
 
@@ -497,15 +518,6 @@ void Synth::create_lfos() noexcept
     register_param<LFO::Oscillator_::WaveformParam>(ParamId::L7WAV, lfos_rw[6]->waveform);
     register_param<LFO::Oscillator_::WaveformParam>(ParamId::L8WAV, lfos_rw[7]->waveform);
 
-    register_param<ToggleParam>(ParamId::L1SYN, lfos_rw[0]->tempo_sync);
-    register_param<ToggleParam>(ParamId::L2SYN, lfos_rw[1]->tempo_sync);
-    register_param<ToggleParam>(ParamId::L3SYN, lfos_rw[2]->tempo_sync);
-    register_param<ToggleParam>(ParamId::L4SYN, lfos_rw[3]->tempo_sync);
-    register_param<ToggleParam>(ParamId::L5SYN, lfos_rw[4]->tempo_sync);
-    register_param<ToggleParam>(ParamId::L6SYN, lfos_rw[5]->tempo_sync);
-    register_param<ToggleParam>(ParamId::L7SYN, lfos_rw[6]->tempo_sync);
-    register_param<ToggleParam>(ParamId::L8SYN, lfos_rw[7]->tempo_sync);
-
     register_param<ToggleParam>(ParamId::L1CEN, lfos_rw[0]->center);
     register_param<ToggleParam>(ParamId::L2CEN, lfos_rw[1]->center);
     register_param<ToggleParam>(ParamId::L3CEN, lfos_rw[2]->center);
@@ -514,6 +526,15 @@ void Synth::create_lfos() noexcept
     register_param<ToggleParam>(ParamId::L6CEN, lfos_rw[5]->center);
     register_param<ToggleParam>(ParamId::L7CEN, lfos_rw[6]->center);
     register_param<ToggleParam>(ParamId::L8CEN, lfos_rw[7]->center);
+
+    register_param<ToggleParam>(ParamId::L1SYN, lfos_rw[0]->tempo_sync);
+    register_param<ToggleParam>(ParamId::L2SYN, lfos_rw[1]->tempo_sync);
+    register_param<ToggleParam>(ParamId::L3SYN, lfos_rw[2]->tempo_sync);
+    register_param<ToggleParam>(ParamId::L4SYN, lfos_rw[3]->tempo_sync);
+    register_param<ToggleParam>(ParamId::L5SYN, lfos_rw[4]->tempo_sync);
+    register_param<ToggleParam>(ParamId::L6SYN, lfos_rw[5]->tempo_sync);
+    register_param<ToggleParam>(ParamId::L7SYN, lfos_rw[6]->tempo_sync);
+    register_param<ToggleParam>(ParamId::L8SYN, lfos_rw[7]->tempo_sync);
 }
 
 
@@ -602,6 +623,10 @@ void Synth::stop_lfos() noexcept
     for (Integer i = 0; i != LFOS; ++i) {
         lfos_rw[i]->stop(0.0);
     }
+
+    effects.chorus.lfo_1.stop(0.0);
+    effects.chorus.lfo_2.stop(0.0);
+    effects.chorus.lfo_3.stop(0.0);
 }
 
 
@@ -618,6 +643,10 @@ void Synth::start_lfos() noexcept
     for (Integer i = 0; i != LFOS; ++i) {
         lfos_rw[i]->start(0.0);
     }
+
+    effects.chorus.lfo_1.start(0.0);
+    effects.chorus.lfo_2.start(0.0);
+    effects.chorus.lfo_3.start(0.0);
 }
 
 
@@ -941,21 +970,6 @@ Number Synth::get_param_default_ratio(ParamId const param_id) const noexcept
         case ParamId::L6WAV: return lfos_rw[5]->waveform.get_default_ratio();
         case ParamId::L7WAV: return lfos_rw[6]->waveform.get_default_ratio();
         case ParamId::L8WAV: return lfos_rw[7]->waveform.get_default_ratio();
-        case ParamId::L1SYN: return lfos_rw[0]->tempo_sync.get_default_ratio();
-        case ParamId::L2SYN: return lfos_rw[1]->tempo_sync.get_default_ratio();
-        case ParamId::L3SYN: return lfos_rw[2]->tempo_sync.get_default_ratio();
-        case ParamId::L4SYN: return lfos_rw[3]->tempo_sync.get_default_ratio();
-        case ParamId::L5SYN: return lfos_rw[4]->tempo_sync.get_default_ratio();
-        case ParamId::L6SYN: return lfos_rw[5]->tempo_sync.get_default_ratio();
-        case ParamId::L7SYN: return lfos_rw[6]->tempo_sync.get_default_ratio();
-        case ParamId::L8SYN: return lfos_rw[7]->tempo_sync.get_default_ratio();
-        case ParamId::EESYN: return effects.echo.tempo_sync.get_default_ratio();
-        case ParamId::MF1LOG: return modulator_params.filter_1_log_scale.get_default_ratio();
-        case ParamId::MF2LOG: return modulator_params.filter_2_log_scale.get_default_ratio();
-        case ParamId::CF1LOG: return carrier_params.filter_1_log_scale.get_default_ratio();
-        case ParamId::CF2LOG: return carrier_params.filter_2_log_scale.get_default_ratio();
-        case ParamId::EF1LOG: return effects.filter_1_log_scale.get_default_ratio();
-        case ParamId::EF2LOG: return effects.filter_2_log_scale.get_default_ratio();
         case ParamId::L1CEN: return lfos_rw[0]->center.get_default_ratio();
         case ParamId::L2CEN: return lfos_rw[1]->center.get_default_ratio();
         case ParamId::L3CEN: return lfos_rw[2]->center.get_default_ratio();
@@ -964,6 +978,28 @@ Number Synth::get_param_default_ratio(ParamId const param_id) const noexcept
         case ParamId::L6CEN: return lfos_rw[5]->center.get_default_ratio();
         case ParamId::L7CEN: return lfos_rw[6]->center.get_default_ratio();
         case ParamId::L8CEN: return lfos_rw[7]->center.get_default_ratio();
+        case ParamId::L1SYN: return lfos_rw[0]->tempo_sync.get_default_ratio();
+        case ParamId::L2SYN: return lfos_rw[1]->tempo_sync.get_default_ratio();
+        case ParamId::L3SYN: return lfos_rw[2]->tempo_sync.get_default_ratio();
+        case ParamId::L4SYN: return lfos_rw[3]->tempo_sync.get_default_ratio();
+        case ParamId::L5SYN: return lfos_rw[4]->tempo_sync.get_default_ratio();
+        case ParamId::L6SYN: return lfos_rw[5]->tempo_sync.get_default_ratio();
+        case ParamId::L7SYN: return lfos_rw[6]->tempo_sync.get_default_ratio();
+        case ParamId::L8SYN: return lfos_rw[7]->tempo_sync.get_default_ratio();
+        case ParamId::ECSYN: return effects.chorus.tempo_sync.get_default_ratio();
+        case ParamId::EESYN: return effects.echo.tempo_sync.get_default_ratio();
+        case ParamId::MF1LOG: return modulator_params.filter_1_log_scale.get_default_ratio();
+        case ParamId::MF2LOG: return modulator_params.filter_2_log_scale.get_default_ratio();
+        case ParamId::CF1LOG: return carrier_params.filter_1_log_scale.get_default_ratio();
+        case ParamId::CF2LOG: return carrier_params.filter_2_log_scale.get_default_ratio();
+        case ParamId::EF1LOG: return effects.filter_1_log_scale.get_default_ratio();
+        case ParamId::EF2LOG: return effects.filter_2_log_scale.get_default_ratio();
+        case ParamId::N1DYN: return envelopes_rw[0]->dynamic.get_default_ratio();
+        case ParamId::N2DYN: return envelopes_rw[1]->dynamic.get_default_ratio();
+        case ParamId::N3DYN: return envelopes_rw[2]->dynamic.get_default_ratio();
+        case ParamId::N4DYN: return envelopes_rw[3]->dynamic.get_default_ratio();
+        case ParamId::N5DYN: return envelopes_rw[4]->dynamic.get_default_ratio();
+        case ParamId::N6DYN: return envelopes_rw[5]->dynamic.get_default_ratio();
         default: return 0.0; // This should neacver be reached.
     }
 }
@@ -999,21 +1035,6 @@ Number Synth::get_param_max_value(ParamId const param_id) const noexcept
         case ParamId::L6WAV: return lfos_rw[5]->waveform.get_max_value();
         case ParamId::L7WAV: return lfos_rw[6]->waveform.get_max_value();
         case ParamId::L8WAV: return lfos_rw[7]->waveform.get_max_value();
-        case ParamId::L1SYN: return lfos_rw[0]->tempo_sync.get_max_value();
-        case ParamId::L2SYN: return lfos_rw[1]->tempo_sync.get_max_value();
-        case ParamId::L3SYN: return lfos_rw[2]->tempo_sync.get_max_value();
-        case ParamId::L4SYN: return lfos_rw[3]->tempo_sync.get_max_value();
-        case ParamId::L5SYN: return lfos_rw[4]->tempo_sync.get_max_value();
-        case ParamId::L6SYN: return lfos_rw[5]->tempo_sync.get_max_value();
-        case ParamId::L7SYN: return lfos_rw[6]->tempo_sync.get_max_value();
-        case ParamId::L8SYN: return lfos_rw[7]->tempo_sync.get_max_value();
-        case ParamId::EESYN: return effects.echo.tempo_sync.get_max_value();
-        case ParamId::MF1LOG: return modulator_params.filter_1_log_scale.get_max_value();
-        case ParamId::MF2LOG: return modulator_params.filter_2_log_scale.get_max_value();
-        case ParamId::CF1LOG: return carrier_params.filter_1_log_scale.get_max_value();
-        case ParamId::CF2LOG: return carrier_params.filter_2_log_scale.get_max_value();
-        case ParamId::EF1LOG: return effects.filter_1_log_scale.get_max_value();
-        case ParamId::EF2LOG: return effects.filter_2_log_scale.get_max_value();
         case ParamId::L1CEN: return lfos_rw[0]->center.get_max_value();
         case ParamId::L2CEN: return lfos_rw[1]->center.get_max_value();
         case ParamId::L3CEN: return lfos_rw[2]->center.get_max_value();
@@ -1022,6 +1043,28 @@ Number Synth::get_param_max_value(ParamId const param_id) const noexcept
         case ParamId::L6CEN: return lfos_rw[5]->center.get_max_value();
         case ParamId::L7CEN: return lfos_rw[6]->center.get_max_value();
         case ParamId::L8CEN: return lfos_rw[7]->center.get_max_value();
+        case ParamId::L1SYN: return lfos_rw[0]->tempo_sync.get_max_value();
+        case ParamId::L2SYN: return lfos_rw[1]->tempo_sync.get_max_value();
+        case ParamId::L3SYN: return lfos_rw[2]->tempo_sync.get_max_value();
+        case ParamId::L4SYN: return lfos_rw[3]->tempo_sync.get_max_value();
+        case ParamId::L5SYN: return lfos_rw[4]->tempo_sync.get_max_value();
+        case ParamId::L6SYN: return lfos_rw[5]->tempo_sync.get_max_value();
+        case ParamId::L7SYN: return lfos_rw[6]->tempo_sync.get_max_value();
+        case ParamId::L8SYN: return lfos_rw[7]->tempo_sync.get_max_value();
+        case ParamId::ECSYN: return effects.chorus.tempo_sync.get_max_value();
+        case ParamId::EESYN: return effects.echo.tempo_sync.get_max_value();
+        case ParamId::MF1LOG: return modulator_params.filter_1_log_scale.get_max_value();
+        case ParamId::MF2LOG: return modulator_params.filter_2_log_scale.get_max_value();
+        case ParamId::CF1LOG: return carrier_params.filter_1_log_scale.get_max_value();
+        case ParamId::CF2LOG: return carrier_params.filter_2_log_scale.get_max_value();
+        case ParamId::EF1LOG: return effects.filter_1_log_scale.get_max_value();
+        case ParamId::EF2LOG: return effects.filter_2_log_scale.get_max_value();
+        case ParamId::N1DYN: return envelopes_rw[0]->dynamic.get_max_value();
+        case ParamId::N2DYN: return envelopes_rw[1]->dynamic.get_max_value();
+        case ParamId::N3DYN: return envelopes_rw[2]->dynamic.get_max_value();
+        case ParamId::N4DYN: return envelopes_rw[3]->dynamic.get_max_value();
+        case ParamId::N5DYN: return envelopes_rw[4]->dynamic.get_max_value();
+        case ParamId::N6DYN: return envelopes_rw[5]->dynamic.get_max_value();
         default: return 0.0; // This should neacver be reached.
     }
 }
@@ -1061,21 +1104,6 @@ Byte Synth::int_param_ratio_to_display_value(
         case ParamId::L6WAV: return lfos_rw[5]->waveform.ratio_to_value(ratio);
         case ParamId::L7WAV: return lfos_rw[6]->waveform.ratio_to_value(ratio);
         case ParamId::L8WAV: return lfos_rw[7]->waveform.ratio_to_value(ratio);
-        case ParamId::L1SYN: return lfos_rw[0]->tempo_sync.ratio_to_value(ratio);
-        case ParamId::L2SYN: return lfos_rw[1]->tempo_sync.ratio_to_value(ratio);
-        case ParamId::L3SYN: return lfos_rw[2]->tempo_sync.ratio_to_value(ratio);
-        case ParamId::L4SYN: return lfos_rw[3]->tempo_sync.ratio_to_value(ratio);
-        case ParamId::L5SYN: return lfos_rw[4]->tempo_sync.ratio_to_value(ratio);
-        case ParamId::L6SYN: return lfos_rw[5]->tempo_sync.ratio_to_value(ratio);
-        case ParamId::L7SYN: return lfos_rw[6]->tempo_sync.ratio_to_value(ratio);
-        case ParamId::L8SYN: return lfos_rw[7]->tempo_sync.ratio_to_value(ratio);
-        case ParamId::EESYN: return effects.echo.tempo_sync.ratio_to_value(ratio);
-        case ParamId::MF1LOG: return modulator_params.filter_1_log_scale.ratio_to_value(ratio);
-        case ParamId::MF2LOG: return modulator_params.filter_2_log_scale.ratio_to_value(ratio);
-        case ParamId::CF1LOG: return carrier_params.filter_1_log_scale.ratio_to_value(ratio);
-        case ParamId::CF2LOG: return carrier_params.filter_2_log_scale.ratio_to_value(ratio);
-        case ParamId::EF1LOG: return effects.filter_1_log_scale.ratio_to_value(ratio);
-        case ParamId::EF2LOG: return effects.filter_2_log_scale.ratio_to_value(ratio);
         case ParamId::L1CEN: return lfos_rw[0]->center.ratio_to_value(ratio);
         case ParamId::L2CEN: return lfos_rw[1]->center.ratio_to_value(ratio);
         case ParamId::L3CEN: return lfos_rw[2]->center.ratio_to_value(ratio);
@@ -1084,6 +1112,28 @@ Byte Synth::int_param_ratio_to_display_value(
         case ParamId::L6CEN: return lfos_rw[5]->center.ratio_to_value(ratio);
         case ParamId::L7CEN: return lfos_rw[6]->center.ratio_to_value(ratio);
         case ParamId::L8CEN: return lfos_rw[7]->center.ratio_to_value(ratio);
+        case ParamId::L1SYN: return lfos_rw[0]->tempo_sync.ratio_to_value(ratio);
+        case ParamId::L2SYN: return lfos_rw[1]->tempo_sync.ratio_to_value(ratio);
+        case ParamId::L3SYN: return lfos_rw[2]->tempo_sync.ratio_to_value(ratio);
+        case ParamId::L4SYN: return lfos_rw[3]->tempo_sync.ratio_to_value(ratio);
+        case ParamId::L5SYN: return lfos_rw[4]->tempo_sync.ratio_to_value(ratio);
+        case ParamId::L6SYN: return lfos_rw[5]->tempo_sync.ratio_to_value(ratio);
+        case ParamId::L7SYN: return lfos_rw[6]->tempo_sync.ratio_to_value(ratio);
+        case ParamId::L8SYN: return lfos_rw[7]->tempo_sync.ratio_to_value(ratio);
+        case ParamId::ECSYN: return effects.chorus.tempo_sync.ratio_to_value(ratio);
+        case ParamId::EESYN: return effects.echo.tempo_sync.ratio_to_value(ratio);
+        case ParamId::MF1LOG: return modulator_params.filter_1_log_scale.ratio_to_value(ratio);
+        case ParamId::MF2LOG: return modulator_params.filter_2_log_scale.ratio_to_value(ratio);
+        case ParamId::CF1LOG: return carrier_params.filter_1_log_scale.ratio_to_value(ratio);
+        case ParamId::CF2LOG: return carrier_params.filter_2_log_scale.ratio_to_value(ratio);
+        case ParamId::EF1LOG: return effects.filter_1_log_scale.ratio_to_value(ratio);
+        case ParamId::EF2LOG: return effects.filter_2_log_scale.ratio_to_value(ratio);
+        case ParamId::N1DYN: return envelopes_rw[0]->dynamic.ratio_to_value(ratio);
+        case ParamId::N2DYN: return envelopes_rw[1]->dynamic.ratio_to_value(ratio);
+        case ParamId::N3DYN: return envelopes_rw[2]->dynamic.ratio_to_value(ratio);
+        case ParamId::N4DYN: return envelopes_rw[3]->dynamic.ratio_to_value(ratio);
+        case ParamId::N5DYN: return envelopes_rw[4]->dynamic.ratio_to_value(ratio);
+        case ParamId::N6DYN: return envelopes_rw[5]->dynamic.ratio_to_value(ratio);
         default: return 0; // This should never be reached.
     }
 }
@@ -1092,7 +1142,7 @@ Byte Synth::int_param_ratio_to_display_value(
 Synth::ControllerId Synth::get_param_controller_id_atomic(
         ParamId const param_id
 ) const noexcept {
-    return (Synth::ControllerId)controller_assignments[param_id].load();
+    return (ControllerId)controller_assignments[param_id].load();
 }
 
 
@@ -1121,6 +1171,10 @@ Sample const* const* Synth::initialize_rendering(
     for (Integer i = 0; i != LFOS; ++i) {
         lfos_rw[i]->skip_round(round, sample_count);
     }
+
+    effects.chorus.lfo_1.skip_round(round, sample_count);
+    effects.chorus.lfo_2.skip_round(round, sample_count);
+    effects.chorus.lfo_3.skip_round(round, sample_count);
 
     clear_midi_controllers();
 
@@ -1194,13 +1248,6 @@ void Synth::handle_set_param(ParamId const param_id, Number const ratio) noexcep
             case ParamId::L6SYN: lfos_rw[5]->tempo_sync.set_ratio(ratio); break;
             case ParamId::L7SYN: lfos_rw[6]->tempo_sync.set_ratio(ratio); break;
             case ParamId::L8SYN: lfos_rw[7]->tempo_sync.set_ratio(ratio); break;
-            case ParamId::EESYN: effects.echo.tempo_sync.set_ratio(ratio); break;
-            case ParamId::MF1LOG: modulator_params.filter_1_log_scale.set_ratio(ratio); break;
-            case ParamId::MF2LOG: modulator_params.filter_2_log_scale.set_ratio(ratio); break;
-            case ParamId::CF1LOG: carrier_params.filter_1_log_scale.set_ratio(ratio); break;
-            case ParamId::CF2LOG: carrier_params.filter_2_log_scale.set_ratio(ratio); break;
-            case ParamId::EF1LOG: effects.filter_1_log_scale.set_ratio(ratio); break;
-            case ParamId::EF2LOG: effects.filter_2_log_scale.set_ratio(ratio); break;
             case ParamId::L1CEN: lfos_rw[0]->center.set_ratio(ratio); break;
             case ParamId::L2CEN: lfos_rw[1]->center.set_ratio(ratio); break;
             case ParamId::L3CEN: lfos_rw[2]->center.set_ratio(ratio); break;
@@ -1209,6 +1256,20 @@ void Synth::handle_set_param(ParamId const param_id, Number const ratio) noexcep
             case ParamId::L6CEN: lfos_rw[5]->center.set_ratio(ratio); break;
             case ParamId::L7CEN: lfos_rw[6]->center.set_ratio(ratio); break;
             case ParamId::L8CEN: lfos_rw[7]->center.set_ratio(ratio); break;
+            case ParamId::ECSYN: effects.chorus.tempo_sync.set_ratio(ratio); break;
+            case ParamId::EESYN: effects.echo.tempo_sync.set_ratio(ratio); break;
+            case ParamId::MF1LOG: modulator_params.filter_1_log_scale.set_ratio(ratio); break;
+            case ParamId::MF2LOG: modulator_params.filter_2_log_scale.set_ratio(ratio); break;
+            case ParamId::CF1LOG: carrier_params.filter_1_log_scale.set_ratio(ratio); break;
+            case ParamId::CF2LOG: carrier_params.filter_2_log_scale.set_ratio(ratio); break;
+            case ParamId::EF1LOG: effects.filter_1_log_scale.set_ratio(ratio); break;
+            case ParamId::EF2LOG: effects.filter_2_log_scale.set_ratio(ratio); break;
+            case ParamId::N1DYN: envelopes_rw[0]->dynamic.set_ratio(ratio); break;
+            case ParamId::N2DYN: envelopes_rw[1]->dynamic.set_ratio(ratio); break;
+            case ParamId::N3DYN: envelopes_rw[2]->dynamic.set_ratio(ratio); break;
+            case ParamId::N4DYN: envelopes_rw[3]->dynamic.set_ratio(ratio); break;
+            case ParamId::N5DYN: envelopes_rw[4]->dynamic.set_ratio(ratio); break;
+            case ParamId::N6DYN: envelopes_rw[5]->dynamic.set_ratio(ratio); break;
             default: break; // This should never be reached.
         }
     }
@@ -1256,8 +1317,8 @@ void Synth::handle_clear() noexcept
     reset();
     start_lfos();
 
-    for (int i = 0; i != Synth::ParamId::MAX_PARAM_ID; ++i) {
-        Synth::ParamId const param_id = (Synth::ParamId)i;
+    for (int i = 0; i != ParamId::MAX_PARAM_ID; ++i) {
+        ParamId const param_id = (ParamId)i;
 
         handle_assign_controller(param_id, no_controller);
         handle_set_param(param_id, get_param_default_ratio(param_id));
@@ -1432,21 +1493,6 @@ Number Synth::get_param_ratio(ParamId const param_id) const noexcept
         case ParamId::L6WAV: return lfos_rw[5]->waveform.get_ratio();
         case ParamId::L7WAV: return lfos_rw[6]->waveform.get_ratio();
         case ParamId::L8WAV: return lfos_rw[7]->waveform.get_ratio();
-        case ParamId::L1SYN: return lfos_rw[0]->tempo_sync.get_ratio();
-        case ParamId::L2SYN: return lfos_rw[1]->tempo_sync.get_ratio();
-        case ParamId::L3SYN: return lfos_rw[2]->tempo_sync.get_ratio();
-        case ParamId::L4SYN: return lfos_rw[3]->tempo_sync.get_ratio();
-        case ParamId::L5SYN: return lfos_rw[4]->tempo_sync.get_ratio();
-        case ParamId::L6SYN: return lfos_rw[5]->tempo_sync.get_ratio();
-        case ParamId::L7SYN: return lfos_rw[6]->tempo_sync.get_ratio();
-        case ParamId::L8SYN: return lfos_rw[7]->tempo_sync.get_ratio();
-        case ParamId::EESYN: return effects.echo.tempo_sync.get_ratio();
-        case ParamId::MF1LOG: return modulator_params.filter_1_log_scale.get_ratio();
-        case ParamId::MF2LOG: return modulator_params.filter_2_log_scale.get_ratio();
-        case ParamId::CF1LOG: return carrier_params.filter_1_log_scale.get_ratio();
-        case ParamId::CF2LOG: return carrier_params.filter_2_log_scale.get_ratio();
-        case ParamId::EF1LOG: return effects.filter_1_log_scale.get_ratio();
-        case ParamId::EF2LOG: return effects.filter_2_log_scale.get_ratio();
         case ParamId::L1CEN: return lfos_rw[0]->center.get_ratio();
         case ParamId::L2CEN: return lfos_rw[1]->center.get_ratio();
         case ParamId::L3CEN: return lfos_rw[2]->center.get_ratio();
@@ -1455,6 +1501,28 @@ Number Synth::get_param_ratio(ParamId const param_id) const noexcept
         case ParamId::L6CEN: return lfos_rw[5]->center.get_ratio();
         case ParamId::L7CEN: return lfos_rw[6]->center.get_ratio();
         case ParamId::L8CEN: return lfos_rw[7]->center.get_ratio();
+        case ParamId::L1SYN: return lfos_rw[0]->tempo_sync.get_ratio();
+        case ParamId::L2SYN: return lfos_rw[1]->tempo_sync.get_ratio();
+        case ParamId::L3SYN: return lfos_rw[2]->tempo_sync.get_ratio();
+        case ParamId::L4SYN: return lfos_rw[3]->tempo_sync.get_ratio();
+        case ParamId::L5SYN: return lfos_rw[4]->tempo_sync.get_ratio();
+        case ParamId::L6SYN: return lfos_rw[5]->tempo_sync.get_ratio();
+        case ParamId::L7SYN: return lfos_rw[6]->tempo_sync.get_ratio();
+        case ParamId::L8SYN: return lfos_rw[7]->tempo_sync.get_ratio();
+        case ParamId::ECSYN: return effects.chorus.tempo_sync.get_ratio();
+        case ParamId::EESYN: return effects.echo.tempo_sync.get_ratio();
+        case ParamId::MF1LOG: return modulator_params.filter_1_log_scale.get_ratio();
+        case ParamId::MF2LOG: return modulator_params.filter_2_log_scale.get_ratio();
+        case ParamId::CF1LOG: return carrier_params.filter_1_log_scale.get_ratio();
+        case ParamId::CF2LOG: return carrier_params.filter_2_log_scale.get_ratio();
+        case ParamId::EF1LOG: return effects.filter_1_log_scale.get_ratio();
+        case ParamId::EF2LOG: return effects.filter_2_log_scale.get_ratio();
+        case ParamId::N1DYN: return envelopes_rw[0]->dynamic.get_ratio();
+        case ParamId::N2DYN: return envelopes_rw[1]->dynamic.get_ratio();
+        case ParamId::N3DYN: return envelopes_rw[2]->dynamic.get_ratio();
+        case ParamId::N4DYN: return envelopes_rw[3]->dynamic.get_ratio();
+        case ParamId::N5DYN: return envelopes_rw[4]->dynamic.get_ratio();
+        case ParamId::N6DYN: return envelopes_rw[5]->dynamic.get_ratio();
         default: return 0.0; // This should never be reached.
     }
 }

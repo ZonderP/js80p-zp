@@ -50,18 +50,27 @@ class Delay : public Filter<InputSignalProducerClass>
             InputSignalProducerClass& input,
             ToggleParam const* tempo_sync = NULL
         ) noexcept;
+
+        Delay(
+            InputSignalProducerClass& input,
+            FloatParam& time_leader,
+            ToggleParam const* tempo_sync = NULL
+        ) noexcept;
+
         Delay(
             InputSignalProducerClass& input,
             FloatParam& gain_leader,
             FloatParam& time_leader,
             ToggleParam const* tempo_sync = NULL
         ) noexcept;
+
         Delay(
             InputSignalProducerClass& input,
             FloatParam& gain_leader,
             Seconds const time,
             ToggleParam const* tempo_sync = NULL
         ) noexcept;
+
         virtual ~Delay();
 
         virtual void set_block_size(Integer const new_block_size) noexcept override;
@@ -113,6 +122,7 @@ class Delay : public Filter<InputSignalProducerClass>
         ) noexcept;
 
         Integer const delay_buffer_oversize;
+        bool const is_gain_constant_1;
 
         SignalProducer const* feedback_signal_producer;
         Sample** delay_buffer;
@@ -127,6 +137,172 @@ class Delay : public Filter<InputSignalProducerClass>
         Integer delay_buffer_size;
         Number delay_buffer_size_inv;
         bool is_starting;
+        bool need_gain;
+};
+
+
+enum PannedDelayStereoMode {
+    NORMAL = 0,
+    FLIPPED = 1
+};
+
+
+template<class InputSignalProducerClass, class FilterInputClass = Delay<InputSignalProducerClass> >
+class PannedDelay : public Filter<FilterInputClass>
+{
+    friend class SignalProducer;
+
+    public:
+        PannedDelay(
+            InputSignalProducerClass& input,
+            PannedDelayStereoMode const stereo_mode,
+            ToggleParam const* tempo_sync = NULL
+        );
+
+        PannedDelay(
+            InputSignalProducerClass& input,
+            PannedDelayStereoMode const stereo_mode,
+            FloatParam& delay_time_leader,
+            ToggleParam const* tempo_sync = NULL
+        );
+
+        PannedDelay(
+            InputSignalProducerClass& input,
+            PannedDelayStereoMode const stereo_mode,
+            FloatParam& panning_leader,
+            FloatParam& delay_time_leader,
+            ToggleParam const* tempo_sync = NULL,
+            Integer const number_of_children = 0
+        );
+
+        virtual ~PannedDelay();
+
+        virtual void set_block_size(Integer const new_block_size) noexcept override;
+
+    protected:
+        PannedDelay(
+            InputSignalProducerClass& delay_input,
+            FilterInputClass& filter_input,
+            PannedDelayStereoMode const stereo_mode,
+            ToggleParam const* tempo_sync = NULL,
+            Integer const number_of_children = 0
+        );
+
+        PannedDelay(
+            InputSignalProducerClass& delay_input,
+            FilterInputClass& filter_input,
+            PannedDelayStereoMode const stereo_mode,
+            FloatParam& panning_leader,
+            FloatParam& delay_time_leader,
+            ToggleParam const* tempo_sync = NULL,
+            Integer const number_of_children = 0
+        );
+
+        PannedDelay(
+            InputSignalProducerClass& delay_input,
+            FilterInputClass& filter_input,
+            PannedDelayStereoMode const stereo_mode,
+            FloatParam& panning_leader,
+            FloatParam& delay_gain_leader,
+            FloatParam& delay_time_leader,
+            ToggleParam const* tempo_sync = NULL,
+            Integer const number_of_children = 0
+        );
+
+        PannedDelay(
+            InputSignalProducerClass& delay_input,
+            FilterInputClass& filter_input,
+            PannedDelayStereoMode const stereo_mode,
+            FloatParam& panning_leader,
+            FloatParam& delay_gain_leader,
+            Seconds const delay_time,
+            ToggleParam const* tempo_sync = NULL,
+            Integer const number_of_children = 0
+        );
+
+        Sample const* const* initialize_rendering(
+            Integer const round,
+            Integer const sample_count
+        ) noexcept;
+
+        void render(
+            Integer const round,
+            Integer const first_sample_index,
+            Integer const last_sample_index,
+            Sample** buffer
+        ) noexcept;
+
+    private:
+        static constexpr Integer NUMBER_OF_CHILDREN = 2;
+
+        void initialize_instance() noexcept;
+
+        bool const is_flipped;
+
+        Sample** stereo_gain_buffer;
+        Sample const* panning_buffer;
+        Sample stereo_gain_value[2];
+        Sample panning_value;
+
+    public:
+        FloatParam panning;
+
+        Delay<InputSignalProducerClass> delay;
+};
+
+
+template<class InputSignalProducerClass>
+using HighShelfDelay = BiquadFilter< Delay<InputSignalProducerClass> >;
+
+
+template<class InputSignalProducerClass>
+using HighShelfPannedDelayBase = PannedDelay< InputSignalProducerClass, HighShelfDelay<InputSignalProducerClass> >;
+
+
+template<class InputSignalProducerClass>
+class HighShelfPannedDelay : public HighShelfPannedDelayBase<InputSignalProducerClass>
+{
+    friend class SignalProducer;
+
+    public:
+        HighShelfPannedDelay(
+            InputSignalProducerClass& input,
+            PannedDelayStereoMode const stereo_mode,
+            ToggleParam const* tempo_sync = NULL
+        );
+
+        HighShelfPannedDelay(
+            InputSignalProducerClass& input,
+            PannedDelayStereoMode const stereo_mode,
+            FloatParam& panning_leader,
+            FloatParam& delay_gain_leader,
+            FloatParam& delay_time_leader,
+            FloatParam& high_shelf_filter_frequency_leader,
+            FloatParam& high_shelf_filter_gain_leader,
+            ToggleParam const* tempo_sync = NULL
+        );
+
+        HighShelfPannedDelay(
+            InputSignalProducerClass& input,
+            PannedDelayStereoMode const stereo_mode,
+            FloatParam& panning_leader,
+            FloatParam& delay_gain_leader,
+            Seconds const delay_time,
+            FloatParam& high_shelf_filter_frequency_leader,
+            FloatParam& high_shelf_filter_gain_leader,
+            ToggleParam const* tempo_sync = NULL
+        );
+
+    private:
+        static constexpr Integer NUMBER_OF_CHILDREN = 3;
+
+        void initialize_instance() noexcept;
+
+        typename HighShelfDelay<InputSignalProducerClass>::TypeParam high_shelf_filter_type;
+        FloatParam high_shelf_filter_q;
+
+    public:
+        HighShelfDelay<InputSignalProducerClass> high_shelf_filter;
 };
 
 }

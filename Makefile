@@ -94,13 +94,15 @@ SYNTH_COMPONENTS = \
 	$(PARAM_COMPONENTS) \
 	synth \
 	synth/biquad_filter \
-	synth/comb_filter \
+	synth/chorus \
 	synth/delay \
 	synth/distortion \
 	synth/echo \
 	synth/effect \
 	synth/effects \
 	synth/filter \
+	synth/gain \
+	synth/mixer \
 	synth/reverb \
 	synth/voice \
 	synth/wavefolder \
@@ -109,19 +111,21 @@ SYNTH_COMPONENTS = \
 TESTS = \
 	test_example \
 	test_biquad_filter \
-	test_comb_filter \
 	test_delay \
 	test_distortion \
 	test_envelope \
 	test_flexible_controller \
+	test_gain \
 	test_gui \
 	test_lfo \
 	test_math \
 	test_midi_controller \
+	test_mixer \
 	test_oscillator \
 	test_param \
 	test_bank \
 	test_queue \
+	test_renderer \
 	test_serializer \
 	test_signal_producer \
 	test_synth \
@@ -151,6 +155,7 @@ JS80P_HEADERS = \
 	src/gui/gui.hpp \
 	src/gui/widgets.hpp \
 	src/bank.hpp \
+	src/renderer.hpp \
 	src/serializer.hpp \
 	$(SYNTH_HEADERS)
 
@@ -263,11 +268,13 @@ check: perf $(TEST_LIBS) $(TEST_BINS) | $(BUILD_DIR)
 	$(VALGRIND) $(BUILD_DIR)/test_lfo$(EXE)
 	$(VALGRIND) $(BUILD_DIR)/test_biquad_filter$(EXE)
 	$(VALGRIND) $(BUILD_DIR)/test_delay$(EXE)
-	$(VALGRIND) $(BUILD_DIR)/test_comb_filter$(EXE)
 	$(VALGRIND) $(BUILD_DIR)/test_distortion$(EXE)
 	$(VALGRIND) $(BUILD_DIR)/test_wavefolder$(EXE)
+	$(VALGRIND) $(BUILD_DIR)/test_gain$(EXE)
 	$(VALGRIND) $(BUILD_DIR)/test_voice$(EXE)
+	$(VALGRIND) $(BUILD_DIR)/test_mixer$(EXE)
 	$(VALGRIND) $(BUILD_DIR)/test_synth$(EXE)
+	$(VALGRIND) $(BUILD_DIR)/test_renderer$(EXE)
 	$(VALGRIND) $(BUILD_DIR)/test_serializer$(EXE)
 	$(VALGRIND) $(BUILD_DIR)/test_bank$(EXE)
 	$(VALGRIND) $(BUILD_DIR)/test_gui$(EXE)
@@ -381,16 +388,26 @@ $(OBJ_VST3_MAIN): \
 		$(TARGET_PLATFORM_CXXINCS) $(VST3_CXXINCS) $(VST3_CXXFLAGS) $(TARGET_PLATFORM_CXXFLAGS) \
 		$(DEBUG_LOG) -c $< -o $@
 
+$(BUILD_DIR)/perf_math$(EXE): \
+		tests/performance/perf_math.cpp \
+		src/synth/math.hpp src/synth/math.cpp \
+		src/js80p.hpp \
+		| $(BUILD_DIR)
+	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
+
 $(BUILD_DIR)/test_example$(EXE): \
 	tests/test_example.cpp \
 	$(TEST_LIBS) \
 	| $(BUILD_DIR)
 	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
 
-$(BUILD_DIR)/test_envelope$(EXE): \
-		tests/test_envelope.cpp \
-		$(PARAM_HEADERS) $(PARAM_SOURCES) \
+$(BUILD_DIR)/test_bank$(EXE): \
+		tests/test_bank.cpp \
+		src/bank.cpp src/bank.hpp \
+		src/serializer.cpp src/serializer.hpp \
 		$(TEST_LIBS) \
+		$(SYNTH_HEADERS) \
+		$(SYNTH_SOURCES) \
 		| $(BUILD_DIR)
 	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
 
@@ -403,25 +420,18 @@ $(BUILD_DIR)/test_biquad_filter$(EXE): \
 		| $(BUILD_DIR)
 	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
 
-$(BUILD_DIR)/test_comb_filter$(EXE): \
-		tests/test_comb_filter.cpp \
-		src/synth/comb_filter.cpp src/synth/comb_filter.hpp \
+$(BUILD_DIR)/test_delay$(EXE): \
+		tests/test_delay.cpp \
 		src/synth/delay.cpp src/synth/delay.hpp \
 		src/synth/filter.cpp src/synth/filter.hpp \
 		src/synth/biquad_filter.cpp src/synth/biquad_filter.hpp \
 		$(PARAM_HEADERS) $(PARAM_SOURCES) \
 		$(TEST_LIBS) \
 		| $(BUILD_DIR)
-	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
-
-$(BUILD_DIR)/test_delay$(EXE): \
-		tests/test_delay.cpp \
-		src/synth/delay.cpp src/synth/delay.hpp \
-		src/synth/filter.cpp src/synth/filter.hpp \
-		$(PARAM_HEADERS) $(PARAM_SOURCES) \
-		$(TEST_LIBS) \
-		| $(BUILD_DIR)
-	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
+	$(CPP_DEV_PLATFORM) \
+		$(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) \
+		-Wno-maybe-uninitialized \
+		-o $@ $<
 
 $(BUILD_DIR)/test_distortion$(EXE): \
 		tests/test_distortion.cpp \
@@ -432,9 +442,24 @@ $(BUILD_DIR)/test_distortion$(EXE): \
 		| $(BUILD_DIR)
 	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
 
+$(BUILD_DIR)/test_envelope$(EXE): \
+		tests/test_envelope.cpp \
+		$(PARAM_HEADERS) $(PARAM_SOURCES) \
+		$(TEST_LIBS) \
+		| $(BUILD_DIR)
+	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
+
 $(BUILD_DIR)/test_flexible_controller$(EXE): \
 		tests/test_flexible_controller.cpp \
 		$(PARAM_HEADERS) $(PARAM_SOURCES) \
+		$(TEST_LIBS) \
+		| $(BUILD_DIR)
+	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
+
+$(BUILD_DIR)/test_gain$(EXE): \
+		tests/test_gain.cpp \
+		src/synth/gain.cpp src/synth/gain.hpp \
+		src/synth/filter.cpp src/synth/filter.hpp \
 		$(TEST_LIBS) \
 		| $(BUILD_DIR)
 	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
@@ -473,6 +498,15 @@ $(BUILD_DIR)/test_midi_controller$(EXE): \
 		| $(BUILD_DIR)
 	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
 
+$(BUILD_DIR)/test_mixer$(EXE): \
+		tests/test_mixer.cpp \
+		src/synth/mixer.cpp src/synth/mixer.hpp \
+		src/synth/signal_producer.cpp src/synth/signal_producer.hpp \
+		src/js80p.hpp \
+		$(TEST_LIBS) \
+		| $(BUILD_DIR)
+	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
+
 $(BUILD_DIR)/test_oscillator$(EXE): \
 		tests/test_oscillator.cpp \
 		src/synth/wavetable.cpp src/synth/wavetable.hpp \
@@ -488,20 +522,19 @@ $(BUILD_DIR)/test_param$(EXE): \
 		| $(BUILD_DIR)
 	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
 
-$(BUILD_DIR)/test_bank$(EXE): \
-		tests/test_bank.cpp \
-		src/bank.cpp src/bank.hpp \
-		src/serializer.cpp src/serializer.hpp \
-		$(TEST_LIBS) \
-		$(SYNTH_HEADERS) \
-		$(SYNTH_SOURCES) \
-		| $(BUILD_DIR)
-	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
-
 $(BUILD_DIR)/test_queue$(EXE): \
 		tests/test_queue.cpp \
 		src/synth/queue.cpp src/synth/queue.hpp \
 		$(TEST_LIBS) \
+		| $(BUILD_DIR)
+	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
+
+$(BUILD_DIR)/test_renderer$(EXE): \
+		tests/test_renderer.cpp \
+		src/renderer.hpp \
+		$(TEST_LIBS) \
+		$(SYNTH_HEADERS) \
+		$(SYNTH_SOURCES) \
 		| $(BUILD_DIR)
 	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
 
@@ -545,12 +578,5 @@ $(BUILD_DIR)/test_wavefolder$(EXE): \
 		src/synth/wavefolder.cpp src/synth/wavefolder.hpp \
 		$(PARAM_HEADERS) $(PARAM_SOURCES) \
 		$(TEST_LIBS) \
-		| $(BUILD_DIR)
-	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<
-
-$(BUILD_DIR)/perf_math$(EXE): \
-		tests/performance/perf_math.cpp \
-		src/synth/math.hpp src/synth/math.cpp \
-		src/js80p.hpp \
 		| $(BUILD_DIR)
 	$(CPP_DEV_PLATFORM) $(JS80P_CXXINCS) $(TEST_CXXFLAGS) $(JS80P_CXXFLAGS) -o $@ $<

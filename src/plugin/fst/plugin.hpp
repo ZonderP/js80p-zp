@@ -29,6 +29,7 @@
 #include "bank.hpp"
 #include "js80p.hpp"
 #include "midi.hpp"
+#include "renderer.hpp"
 #include "synth.hpp"
 
 
@@ -93,6 +94,7 @@ class FstPlugin : public Midi::EventHandler
             audioMasterCallback const host_callback,
             GUI::PlatformData const platform_data
         ) noexcept;
+
         ~FstPlugin();
 
         void set_sample_rate(float const new_sample_rate) noexcept;
@@ -162,13 +164,20 @@ class FstPlugin : public Midi::EventHandler
         Synth synth;
 
     private:
-        static constexpr Integer ROUND_MASK = 0x7fff;
+        static constexpr Frequency HOST_CC_UI_UPDATE_FREQUENCY = 6.0;
+        static constexpr Frequency HOST_CC_UI_UPDATE_FREQUENCY_INV = (
+            1.0 / HOST_CC_UI_UPDATE_FREQUENCY
+        );
 
         class Parameter
         {
             public:
                 Parameter();
-                Parameter(char const* name, MidiController* midi_controller);
+                Parameter(
+                    char const* name,
+                    MidiController* midi_controller,
+                    Midi::Controller const controller_id
+                );
                 Parameter(Parameter const& parameter);
                 Parameter(Parameter const&& parameter);
 
@@ -177,20 +186,22 @@ class FstPlugin : public Midi::EventHandler
 
                 char const* get_name() const noexcept;
                 MidiController* get_midi_controller() const noexcept;
+                Midi::Controller get_controller_id() const noexcept;
 
                 // bool needs_host_update() const noexcept;
 
                 float get_value() noexcept;
+                float get_last_set_value() noexcept;
                 void set_value(float const value) noexcept;
 
-                void update_midi_controller_if_dirty() noexcept;
-
+                void clear() noexcept;
                 bool is_dirty() const noexcept;
 
             private:
                 MidiController* midi_controller;
                 char const* name;
-                Integer change_index;
+                Midi::Controller controller_id;
+                // Integer change_index;
                 float value;
                 bool is_dirty_;
         };
@@ -200,10 +211,15 @@ class FstPlugin : public Midi::EventHandler
             MidiController* midi_controller
         ) noexcept;
 
+        void prepare_rendering(Integer const sample_count) noexcept;
+
         void update_bpm() noexcept;
         void update_host_display() noexcept;
 
-        Sample const* const* render_next_round(VstInt32 sample_count) noexcept;
+        void handle_program_change() noexcept;
+        void handle_parameter_changes() noexcept;
+
+        Midi::Byte float_to_midi_byte(float const value) const noexcept;
 
         void import_patch(const std::string& patch) noexcept;
 
@@ -214,11 +230,13 @@ class FstPlugin : public Midi::EventHandler
         GUI::PlatformData const platform_data;
 
         ERect window_rect;
-        Integer round;
         GUI* gui;
+        Renderer renderer;
         Bank bank;
         std::string serialized_bank;
         size_t next_program;
+        Integer min_samples_before_next_cc_ui_update;
+        Integer remaining_samples_before_next_cc_ui_update;
         bool save_current_patch_before_changing_program;
         bool had_midi_cc_event;
 };

@@ -136,6 +136,19 @@ class FloatParam : public Param<Number>
         static constexpr Event::Type EVT_SET_VALUE = 1;
         static constexpr Event::Type EVT_LINEAR_RAMP = 2;
         static constexpr Event::Type EVT_LOG_RAMP = 3;
+        static constexpr Event::Type EVT_ENVELOPE_START = 4;
+        static constexpr Event::Type EVT_ENVELOPE_END = 5;
+
+        /*
+        Some MIDI controllers seem to send multiple changes of the same value with
+        the same timestamp (on the same channel). In order to avoid zero duration
+        ramps and sudden jumps, we force every value change to take place gradually,
+        over a duration which correlates with the magnitude of the change.
+        */
+        static constexpr Seconds MIDI_CTL_BIG_CHANGE_DURATION = 0.20;
+        static constexpr Seconds MIDI_CTL_SMALL_CHANGE_DURATION = (
+            MIDI_CTL_BIG_CHANGE_DURATION / 2.5
+        );
 
         /**
          * \brief Orchestrate rendering signals and handling events.
@@ -203,15 +216,20 @@ class FloatParam : public Param<Number>
         Number value_to_ratio(Number const value) const noexcept;
 
         Integer get_change_index() const noexcept;
+
         bool is_constant_in_next_round(
             Integer const round, Integer const sample_count
         ) noexcept;
+
         bool is_constant_until(Integer const sample_count) const noexcept;
+
         void skip_round(Integer const round, Integer const sample_count) noexcept;
+
         void schedule_value(
             Seconds const time_offset,
             Number const new_value
         ) noexcept;
+
         void schedule_linear_ramp(
             Seconds const duration,
             Number const target_value
@@ -222,10 +240,11 @@ class FloatParam : public Param<Number>
         void set_flexible_controller(
             FlexibleController* flexible_controller
         ) noexcept;
+
         FlexibleController const* get_flexible_controller() const noexcept;
 
-        void set_envelope(Envelope const* const envelope) noexcept;
-        Envelope const* get_envelope() const noexcept;
+        void set_envelope(Envelope* const envelope) noexcept;
+        Envelope* get_envelope() const noexcept;
         void start_envelope(Seconds const time_offset) noexcept;
         Seconds end_envelope(Seconds const time_offset) noexcept;
 
@@ -248,6 +267,12 @@ class FloatParam : public Param<Number>
         void handle_event(Event const& event) noexcept;
 
     private:
+        enum EnvelopeStage {
+            NONE = 0,
+            DAHDS = 1,
+            R = 2,
+        };
+
         class LinearRampState
         {
             public:
@@ -283,15 +308,41 @@ class FloatParam : public Param<Number>
         void handle_set_value_event(Event const& event) noexcept;
         void handle_linear_ramp_event(Event const& event) noexcept;
         void handle_log_ramp_event(Event const& event) noexcept;
+        void handle_envelope_start_event(Event const& event) noexcept;
+        void handle_envelope_end_event(Event const& event) noexcept;
         void handle_cancel_event(Event const& event) noexcept;
 
         bool is_following_leader() const noexcept;
+
+        Sample const* const* process_lfo(
+            Integer const round,
+            Integer const sample_count
+        ) noexcept;
+
+        Sample const* const* process_midi_controller_events() noexcept;
+
+        Sample const* const* process_flexible_controller(
+            Integer const sample_count
+        ) noexcept;
 
         Seconds smooth_change_duration(
             Number const previous_value,
             Number const controller_value,
             Seconds const duration
         ) const noexcept;
+
+        Sample const* const* process_envelope(
+            Envelope* const envelope
+        ) noexcept;
+
+        Seconds schedule_envelope_value_if_not_reached(
+            Seconds const next_event_time_offset,
+            FloatParam const& time_param,
+            FloatParam const& value_param,
+            Number const amount
+        ) noexcept;
+
+        void update_envelope();
 
         ToggleParam const* const log_scale_toggle;
         Number const* const log_scale_table;
@@ -301,11 +352,20 @@ class FloatParam : public Param<Number>
         Number const log_scale_inv_table_scale;
 
         FloatParam* const leader;
+
         FlexibleController* flexible_controller;
         Integer flexible_controller_change_index;
-        Envelope const* envelope;
+
         LFO* lfo;
         Sample const* const* lfo_buffer;
+
+        Envelope* envelope;
+        Integer envelope_change_index;
+        Seconds envelope_end_time_offset;
+        Seconds envelope_position;
+        Seconds envelope_release_time;
+        EnvelopeStage envelope_stage;
+        bool envelope_end_scheduled;
 
         bool const should_round;
         bool const is_ratio_same_as_value;

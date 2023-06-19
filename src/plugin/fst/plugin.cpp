@@ -366,10 +366,12 @@ FstPlugin::FstPlugin(
     effect(effect),
     host_callback(host_callback),
     platform_data(platform_data),
-    round(0),
     gui(NULL),
+    renderer(synth),
     serialized_bank(""),
     next_program(0),
+    min_samples_before_next_cc_ui_update(8192),
+    remaining_samples_before_next_cc_ui_update(0),
     save_current_patch_before_changing_program(false),
     had_midi_cc_event(false)
 {
@@ -378,7 +380,7 @@ FstPlugin::FstPlugin(
     window_rect.bottom = GUI::HEIGHT;
     window_rect.right = GUI::WIDTH;
 
-    parameters[0] = Parameter("Program", NULL);
+    parameters[0] = Parameter("Program", NULL, Synth::ControllerId::NONE);
     parameters[1] = create_midi_ctl_param(
         Synth::ControllerId::PITCH_WHEEL, &synth.pitch_wheel
     );
@@ -410,6 +412,13 @@ FstPlugin::~FstPlugin()
 
 void FstPlugin::set_sample_rate(float const new_sample_rate) noexcept
 {
+    if (new_sample_rate > HOST_CC_UI_UPDATE_FREQUENCY) {
+        min_samples_before_next_cc_ui_update = 1 + (Integer)(
+            new_sample_rate * HOST_CC_UI_UPDATE_FREQUENCY_INV
+        );
+        remaining_samples_before_next_cc_ui_update = min_samples_before_next_cc_ui_update;
+    }
+
     synth.set_sample_rate((Frequency)new_sample_rate);
 }
 
@@ -417,26 +426,27 @@ void FstPlugin::set_sample_rate(float const new_sample_rate) noexcept
 void FstPlugin::set_block_size(VstIntPtr const new_block_size) noexcept
 {
     synth.set_block_size((Integer)new_block_size);
+    renderer.reset();
 }
 
 
 void FstPlugin::suspend() noexcept
 {
     synth.suspend();
+    renderer.reset();
 }
 
 
 void FstPlugin::resume() noexcept
 {
     synth.resume();
+    renderer.reset();
     host_callback(effect, audioMasterWantMidi, 0, 1, NULL, 0.0f);
 }
 
 
 void FstPlugin::process_events(VstEvents const* const events) noexcept
 {
-    had_midi_cc_event = false;
-
     for (VstInt32 i = 0; i < events->numEvents; ++i) {
         VstEvent* event = events->events[i];
 
@@ -445,7 +455,9 @@ void FstPlugin::process_events(VstEvents const* const events) noexcept
         }
     }
 
-    if (had_midi_cc_event) {
+    if (had_midi_cc_event && remaining_samples_before_next_cc_ui_update == 0) {
+        had_midi_cc_event = false;
+        remaining_samples_before_next_cc_ui_update = min_samples_before_next_cc_ui_update;
         update_host_display();
     }
 }
@@ -472,13 +484,8 @@ void FstPlugin::generate_samples(
         return;
     }
 
-    Sample const* const* buffer = render_next_round(sample_count);
-
-    for (Integer c = 0; c != Synth::OUT_CHANNELS; ++c) {
-        for (VstInt32 i = 0; i != sample_count; ++i) {
-            samples[c][i] = (NumberType)buffer[c][i];
-        }
-    }
+    prepare_rendering(sample_count);
+    renderer.write_next_round<NumberType>(sample_count, samples);
 
     /*
     It would be nice to notify the host about param changes that originate from
@@ -501,36 +508,93 @@ void FstPlugin::generate_samples(
 }
 
 
-Sample const* const* FstPlugin::render_next_round(VstInt32 sample_count) noexcept
+void FstPlugin::prepare_rendering(Integer const sample_count) noexcept
+{
+    handle_program_change();
+    handle_parameter_changes();
+    update_bpm();
+
+    if (had_midi_cc_event) {
+        if (remaining_samples_before_next_cc_ui_update >= sample_count) {
+            remaining_samples_before_next_cc_ui_update -= sample_count;
+        } else {
+            remaining_samples_before_next_cc_ui_update = 0;
+        }
+    }
+}
+
+
+void FstPlugin::handle_program_change() noexcept
 {
     if (parameters[0].is_dirty()) {
         this->next_program = Bank::normalized_parameter_value_to_program_index(
-            (Number)parameters[0].get_value()
+            (Number)parameters[0].get_last_set_value()
         );
     }
 
     size_t const next_program = this->next_program;
     size_t const current_program = bank.get_current_program_index();
 
-    for (size_t i = 0; i != NUMBER_OF_PARAMETERS; ++i) {
-        parameters[i].update_midi_controller_if_dirty();
+    if (next_program == current_program) {
+        return;
     }
 
-    if (next_program != current_program) {
-        if (save_current_patch_before_changing_program) {
-            bank[current_program].import(Serializer::serialize(&synth));
-        } else {
-            save_current_patch_before_changing_program = true;
+    if (save_current_patch_before_changing_program) {
+        bank[current_program].import(Serializer::serialize(&synth));
+    } else {
+        save_current_patch_before_changing_program = true;
+    }
+
+    bank.set_current_program_index(next_program);
+    import_patch(bank[next_program].serialize());
+}
+
+
+void FstPlugin::handle_parameter_changes() noexcept
+{
+    for (size_t i = 1; i != NUMBER_OF_PARAMETERS; ++i) {
+        Parameter& parameter = parameters[i];
+
+        if (LIKELY(!parameter.is_dirty())) {
+            continue;
         }
 
-        bank.set_current_program_index(next_program);
-        import_patch(bank[next_program].serialize());
+        Midi::Controller const controller_id = parameter.get_controller_id();
+
+        parameter.clear();
+
+        if (Synth::is_supported_midi_controller(controller_id)) {
+            /*
+            Some hosts (e.g. FL Studio) swallow most MIDI CC messages, and the
+            only way to make physical knobs and faders on a MIDI keyboard work
+            in the plugin is to export parameters to which those MIDI CC
+            messages can be assigned in the host, and then interpret the
+            changes of these parameters as if the corresponding MIDI CC message
+            had been received.
+            */
+            synth.control_change(
+                0.0,
+                0,
+                controller_id,
+                float_to_midi_byte(parameter.get_last_set_value())
+            );
+        } else {
+            MidiController* const midi_controller = parameter.get_midi_controller();
+
+            if (LIKELY(midi_controller != NULL)) {
+                midi_controller->change(0.0, (Number)parameter.get_last_set_value());
+            }
+        }
     }
+}
 
-    round = (round + 1) & ROUND_MASK;
-    update_bpm();
 
-    return synth.generate_samples(round, (Integer)sample_count);
+Midi::Byte FstPlugin::float_to_midi_byte(float const value) const noexcept
+{
+    return std::min(
+        (Midi::Byte)127,
+        std::max((Midi::Byte)0, (Midi::Byte)std::round(value * 127.0f))
+    );
 }
 
 
@@ -552,33 +616,6 @@ void FstPlugin::update_bpm() noexcept
 
 void FstPlugin::update_host_display() noexcept
 {
-    /*
-    Opcode value obtained by trial and error:
-
-    Based on its name, audioMasterUpdateDisplay might be a host callback to be
-    used for asking the host to update its generic plugin parameter UI, whenever
-    the plugin changes some of its parameters internally. Unfortunately, fst.h
-    doesn't define the opcode for audioMasterUpdateDisplay at the moment.
-
-    Looking at the JuceVSTWrapper::HostChangeUpdater::handleAsyncUpdate() method
-    in the modules/juce_audio_plugin_client/VST/juce_VST_Wrapper.cpp file in
-    JUCE 7.0.5, it seems that audioMasterUpdateDisplay can be called with all
-    arguments set to zero.
-
-    As of writing this, there are 17 known and 32 unknown host opcodes in
-    fst.h, and the known ones seem to be numbered consecutively, without large
-    gaps between the enum values. The opcode with the highest known enum value
-    is audioMasterEndEdit = 44.
-
-    These findings suggest that simply trying the currently unassigned enum
-    values in fst.h between 0 and 50 might reveal the value of the opcode. And
-    indeed, the answer to Life, the Universe, Everything, and the
-    audioMasterUpdateDisplay opcode seems to be 42 - Reaper 6.79 responds with
-    success to this call, and exhibits the desired behaviour of updating its
-    generic plugin parameter UI.
-    */
-    constexpr int audioMasterUpdateDisplay = 42;
-
     host_callback(effect, audioMasterUpdateDisplay, 0, 0, NULL, 0.0f);
 }
 
@@ -591,13 +628,8 @@ void FstPlugin::generate_and_add_samples(
         return;
     }
 
-    Sample const* const* buffer = render_next_round(sample_count);
-
-    for (Integer c = 0; c != Synth::OUT_CHANNELS; ++c) {
-        for (VstInt32 i = 0; i != sample_count; ++i) {
-            samples[c][i] += (float)buffer[c][i];
-        }
-    }
+    prepare_rendering(sample_count);
+    renderer.add_next_round<float>(sample_count, samples);
 }
 
 
@@ -606,6 +638,7 @@ void FstPlugin::import_patch(const std::string& patch) noexcept
     synth.process_messages();
     Serializer::import(&synth, patch);
     synth.process_messages();
+    renderer.reset();
 }
 
 
@@ -781,7 +814,8 @@ FstPlugin::Parameter FstPlugin::create_midi_ctl_param(
         GUI::get_controller(controller_id)->short_name,
         midi_controller != NULL
             ? midi_controller
-            : synth.midi_controllers[controller_id]
+            : synth.midi_controllers[controller_id],
+        (Midi::Controller)controller_id
     );
 }
 
@@ -789,6 +823,7 @@ FstPlugin::Parameter FstPlugin::create_midi_ctl_param(
 FstPlugin::Parameter::Parameter()
     : midi_controller(NULL),
     name("unknown"),
+    controller_id(0),
     // change_index(-1),
     value(0.5f),
     is_dirty_(false)
@@ -796,9 +831,13 @@ FstPlugin::Parameter::Parameter()
 }
 
 
-FstPlugin::Parameter::Parameter(char const* name, MidiController* midi_controller)
-    : midi_controller(midi_controller),
+FstPlugin::Parameter::Parameter(
+        char const* name,
+        MidiController* midi_controller,
+        Midi::Controller const controller_id
+) : midi_controller(midi_controller),
     name(name),
+    controller_id(controller_id),
     // change_index(-1),
     value(0.5f),
     is_dirty_(false)
@@ -809,7 +848,8 @@ FstPlugin::Parameter::Parameter(char const* name, MidiController* midi_controlle
 FstPlugin::Parameter::Parameter(Parameter const& parameter)
     : midi_controller(parameter.midi_controller),
     name(parameter.name),
-    // change_index(parameter.change_index),
+    controller_id(parameter.controller_id),
+    // change_index(-1),
     value(parameter.value),
     is_dirty_(parameter.is_dirty_)
 {
@@ -819,7 +859,8 @@ FstPlugin::Parameter::Parameter(Parameter const& parameter)
 FstPlugin::Parameter::Parameter(Parameter const&& parameter)
     : midi_controller(parameter.midi_controller),
     name(parameter.name),
-    // change_index(parameter.change_index),
+    controller_id(parameter.controller_id),
+    // change_index(-1),
     value(parameter.value),
     is_dirty_(parameter.is_dirty_)
 {
@@ -832,6 +873,7 @@ FstPlugin::Parameter& FstPlugin::Parameter::operator=(
     if (this != &parameter) {
         midi_controller = parameter.midi_controller;
         name = parameter.name;
+        controller_id = parameter.controller_id;
         // change_index = parameter.change_index;
         value = parameter.value;
         is_dirty_ = parameter.is_dirty_;
@@ -847,6 +889,7 @@ FstPlugin::Parameter& FstPlugin::Parameter::operator=(
     if (this != &parameter) {
         midi_controller = parameter.midi_controller;
         name = parameter.name;
+        controller_id = parameter.controller_id;
         // change_index = parameter.change_index;
         value = parameter.value;
         is_dirty_ = parameter.is_dirty_;
@@ -868,6 +911,12 @@ MidiController* FstPlugin::Parameter::get_midi_controller() const noexcept
 }
 
 
+Midi::Controller FstPlugin::Parameter::get_controller_id() const noexcept
+{
+    return controller_id;
+}
+
+
 // bool FstPlugin::Parameter::needs_host_update() const noexcept
 // {
     // if (UNLIKELY(midi_controller == NULL)) {
@@ -881,7 +930,7 @@ MidiController* FstPlugin::Parameter::get_midi_controller() const noexcept
 float FstPlugin::Parameter::get_value() noexcept
 {
     if (UNLIKELY(midi_controller == NULL)) {
-        return this->value;
+        return get_last_set_value();
     }
 
     float const value = (float)midi_controller->get_value();
@@ -892,6 +941,12 @@ float FstPlugin::Parameter::get_value() noexcept
 }
 
 
+float FstPlugin::Parameter::get_last_set_value() noexcept
+{
+    return this->value;
+}
+
+
 void FstPlugin::Parameter::set_value(float const value) noexcept
 {
     this->value = value;
@@ -899,19 +954,9 @@ void FstPlugin::Parameter::set_value(float const value) noexcept
 }
 
 
-void FstPlugin::Parameter::update_midi_controller_if_dirty() noexcept
+void FstPlugin::Parameter::clear() noexcept
 {
-    if (LIKELY(!is_dirty_)) {
-        return;
-    }
-
     is_dirty_ = false;
-
-    if (UNLIKELY(midi_controller == NULL)) {
-        return;
-    }
-
-    midi_controller->change(0.0, (Number)value);
 }
 
 
@@ -945,7 +990,7 @@ void FstPlugin::get_param_display(size_t index, char* buffer) noexcept
     if (index == 0) {
         size_t const program_index = (
             Bank::normalized_parameter_value_to_program_index(
-                (Number)parameters[0].get_value()
+                (Number)parameters[0].get_last_set_value()
             )
         );
 
