@@ -24,16 +24,16 @@
 
 #include "js80p.hpp"
 
-#include "synth/envelope.cpp"
-#include "synth/flexible_controller.cpp"
-#include "synth/lfo.cpp"
-#include "synth/math.cpp"
-#include "synth/midi_controller.cpp"
-#include "synth/oscillator.cpp"
-#include "synth/param.cpp"
-#include "synth/queue.cpp"
-#include "synth/signal_producer.cpp"
-#include "synth/wavetable.cpp"
+#include "dsp/envelope.cpp"
+#include "dsp/flexible_controller.cpp"
+#include "dsp/lfo.cpp"
+#include "dsp/math.cpp"
+#include "dsp/midi_controller.cpp"
+#include "dsp/oscillator.cpp"
+#include "dsp/param.cpp"
+#include "dsp/queue.cpp"
+#include "dsp/signal_producer.cpp"
+#include "dsp/wavetable.cpp"
 
 
 using namespace JS80P;
@@ -214,7 +214,7 @@ TEST(lfo_performance, {
 
     for (Integer round = 0; round != rounds; ++round) {
         Sample const* const* const rendered_samples = (
-            SignalProducer::produce<LFO>(&lfo, round)
+            SignalProducer::produce<LFO>(lfo, round)
         );
         number_of_rendered_samples += BLOCK_SIZE;
 
@@ -259,7 +259,7 @@ void test_lfo_modifier_statistics(
     lfo.center.set_value(centered);
     lfo.start(0.0);
 
-    rendered_samples = SignalProducer::produce<LFO>(&lfo, 1);
+    rendered_samples = SignalProducer::produce<LFO>(lfo, 1);
 
     numbers.reserve(BLOCK_SIZE);
 

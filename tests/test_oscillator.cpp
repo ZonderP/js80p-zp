@@ -23,16 +23,16 @@
 
 #include "js80p.hpp"
 
-#include "synth/envelope.cpp"
-#include "synth/flexible_controller.cpp"
-#include "synth/lfo.cpp"
-#include "synth/math.cpp"
-#include "synth/midi_controller.cpp"
-#include "synth/oscillator.cpp"
-#include "synth/param.cpp"
-#include "synth/queue.cpp"
-#include "synth/signal_producer.cpp"
-#include "synth/wavetable.cpp"
+#include "dsp/envelope.cpp"
+#include "dsp/flexible_controller.cpp"
+#include "dsp/lfo.cpp"
+#include "dsp/math.cpp"
+#include "dsp/midi_controller.cpp"
+#include "dsp/oscillator.cpp"
+#include "dsp/param.cpp"
+#include "dsp/queue.cpp"
+#include "dsp/signal_producer.cpp"
+#include "dsp/wavetable.cpp"
 
 
 using namespace JS80P;
@@ -448,14 +448,10 @@ TEST(oscillator_can_be_started_and_stopped_between_samples, {
     oscillator.start((Seconds)(1.0 - time_offset));
     oscillator.stop((Seconds)(2.0 - time_offset - sample_period));
 
-    block = SignalProducer::produce<SimpleOscillator>(
-        &oscillator, 1, block_size
-    );
+    block = SignalProducer::produce<SimpleOscillator>(oscillator, 1, block_size);
     assert_eq(expected_samples[0], block[0], block_size, DOUBLE_DELTA);
 
-    block = SignalProducer::produce<SimpleOscillator>(
-        &oscillator, 2, block_size
-    );
+    block = SignalProducer::produce<SimpleOscillator>(oscillator, 2, block_size);
     assert_eq(expected_samples[1], block[0], block_size, DOUBLE_DELTA);
 })
 
@@ -524,9 +520,7 @@ void assert_amplitude_and_frequency_automation_are_independent_of_each_other(
 
     oscillator.start(0.0);
 
-    block = SignalProducer::produce<SimpleOscillator>(
-        &oscillator, 1, block_size
-    );
+    block = SignalProducer::produce<SimpleOscillator>(oscillator, 1, block_size);
     assert_eq(expected_samples, block[0], block_size, DOUBLE_DELTA);
 }
 

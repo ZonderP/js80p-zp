@@ -21,20 +21,20 @@
 
 #include "js80p.hpp"
 
-#include "synth/biquad_filter.cpp"
-#include "synth/delay.cpp"
-#include "synth/envelope.cpp"
-#include "synth/filter.cpp"
-#include "synth/flexible_controller.cpp"
-#include "synth/gain.cpp"
-#include "synth/lfo.cpp"
-#include "synth/math.cpp"
-#include "synth/midi_controller.cpp"
-#include "synth/oscillator.cpp"
-#include "synth/param.cpp"
-#include "synth/queue.cpp"
-#include "synth/signal_producer.cpp"
-#include "synth/wavetable.cpp"
+#include "dsp/biquad_filter.cpp"
+#include "dsp/delay.cpp"
+#include "dsp/envelope.cpp"
+#include "dsp/filter.cpp"
+#include "dsp/flexible_controller.cpp"
+#include "dsp/gain.cpp"
+#include "dsp/lfo.cpp"
+#include "dsp/math.cpp"
+#include "dsp/midi_controller.cpp"
+#include "dsp/oscillator.cpp"
+#include "dsp/param.cpp"
+#include "dsp/queue.cpp"
+#include "dsp/signal_producer.cpp"
+#include "dsp/wavetable.cpp"
 
 
 using namespace JS80P;
@@ -253,7 +253,7 @@ void test_delay_with_feedback(
     delay.time.set_value(0.2 * time_scale);
     delay.gain.schedule_value(0.7, 1.0);
 
-    SignalProducer::produce<FixedSignalProducer>(&feedback, 12345);
+    SignalProducer::produce<FixedSignalProducer>(feedback, 12345);
 
     render_rounds< Delay<FixedSignalProducer> >(delay, output, rounds);
 
@@ -321,26 +321,26 @@ TEST(feedback_signal_merging_is_independent_of_rendered_sample_count, {
     delay.gain.set_value(1.0);
     delay.time.set_value(0.2);
 
-    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(&delay, 1, 3), 3);
-    SignalProducer::produce<FixedSignalProducer>(&feedback, 1, 3);
+    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(delay, 1, 3), 3);
+    SignalProducer::produce<FixedSignalProducer>(feedback, 1, 3);
 
-    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(&delay, 2, 1), 1);
-    SignalProducer::produce<FixedSignalProducer>(&feedback, 2, 1);
+    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(delay, 2, 1), 1);
+    SignalProducer::produce<FixedSignalProducer>(feedback, 2, 1);
 
-    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(&delay, 3, 3), 3);
-    SignalProducer::produce<FixedSignalProducer>(&feedback, 3, 3);
+    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(delay, 3, 3), 3);
+    SignalProducer::produce<FixedSignalProducer>(feedback, 3, 3);
 
-    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(&delay, 4, 2), 2);
-    SignalProducer::produce<FixedSignalProducer>(&feedback, 4, 2);
+    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(delay, 4, 2), 2);
+    SignalProducer::produce<FixedSignalProducer>(feedback, 4, 2);
 
-    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(&delay, 5, 1), 1);
-    SignalProducer::produce<FixedSignalProducer>(&feedback, 5, 1);
+    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(delay, 5, 1), 1);
+    SignalProducer::produce<FixedSignalProducer>(feedback, 5, 1);
 
-    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(&delay, 6, 2), 2);
-    SignalProducer::produce<FixedSignalProducer>(&feedback, 6, 2);
+    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(delay, 6, 2), 2);
+    SignalProducer::produce<FixedSignalProducer>(feedback, 6, 2);
 
-    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(&delay, 7, 3), 3);
-    SignalProducer::produce<FixedSignalProducer>(&feedback, 7, 3);
+    output.append(SignalProducer::produce< Delay<FixedSignalProducer> >(delay, 7, 3), 3);
+    SignalProducer::produce<FixedSignalProducer>(feedback, 7, 3);
 
     for (Integer c = 0; c != CHANNELS; ++c) {
         assert_eq(
@@ -383,11 +383,11 @@ TEST(reset_clears_the_delay_buffer, {
     delay.gain.set_value(1.0);
     delay.time.set_value(0.2);
 
-    SignalProducer::produce< Delay<FixedSignalProducer> >(&delay, 1);
-    SignalProducer::produce< Delay<FixedSignalProducer> >(&delay, 2);
+    SignalProducer::produce< Delay<FixedSignalProducer> >(delay, 1);
+    SignalProducer::produce< Delay<FixedSignalProducer> >(delay, 2);
     delay.reset();
     rendered_samples = SignalProducer::produce< Delay<FixedSignalProducer> >(
-        &delay, 3
+        delay, 3
     );
 
     for (Integer c = 0; c != CHANNELS; ++c) {

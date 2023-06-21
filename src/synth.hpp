@@ -26,27 +26,27 @@
 #include "js80p.hpp"
 #include "midi.hpp"
 
-#include "synth/envelope.hpp"
-#include "synth/biquad_filter.hpp"
-#include "synth/chorus.hpp"
-#include "synth/delay.hpp"
-#include "synth/distortion.hpp"
-#include "synth/echo.hpp"
-#include "synth/effect.hpp"
-#include "synth/effects.hpp"
-#include "synth/flexible_controller.hpp"
-#include "synth/filter.hpp"
-#include "synth/gain.hpp"
-#include "synth/lfo.hpp"
-#include "synth/math.hpp"
-#include "synth/midi_controller.hpp"
-#include "synth/mixer.hpp"
-#include "synth/oscillator.hpp"
-#include "synth/param.hpp"
-#include "synth/reverb.hpp"
-#include "synth/queue.hpp"
-#include "synth/signal_producer.hpp"
-#include "synth/voice.hpp"
+#include "dsp/envelope.hpp"
+#include "dsp/biquad_filter.hpp"
+#include "dsp/chorus.hpp"
+#include "dsp/delay.hpp"
+#include "dsp/distortion.hpp"
+#include "dsp/echo.hpp"
+#include "dsp/effect.hpp"
+#include "dsp/effects.hpp"
+#include "dsp/flexible_controller.hpp"
+#include "dsp/filter.hpp"
+#include "dsp/gain.hpp"
+#include "dsp/lfo.hpp"
+#include "dsp/math.hpp"
+#include "dsp/midi_controller.hpp"
+#include "dsp/mixer.hpp"
+#include "dsp/oscillator.hpp"
+#include "dsp/param.hpp"
+#include "dsp/reverb.hpp"
+#include "dsp/queue.hpp"
+#include "dsp/signal_producer.hpp"
+#include "dsp/voice.hpp"
 
 
 namespace JS80P
@@ -647,8 +647,8 @@ class Synth : public Midi::EventHandler, public SignalProducer
 
         void process_messages() noexcept;
 
-        std::string get_param_name(ParamId const param_id) const noexcept;
-        ParamId get_param_id(std::string const name) const noexcept;
+        std::string const& get_param_name(ParamId const param_id) const noexcept;
+        ParamId get_param_id(std::string const& name) const noexcept;
 
         void get_param_id_hash_table_statistics(
             Integer& max_collisions,
@@ -845,8 +845,8 @@ class Synth : public Midi::EventHandler, public SignalProducer
                 ParamIdHashTable() noexcept;
                 ~ParamIdHashTable();
 
-                void add(char const* name, ParamId const param_id) noexcept;
-                ParamId lookup(char const* name) noexcept;
+                void add(std::string const& name, ParamId const param_id) noexcept;
+                ParamId lookup(std::string const& name) noexcept;
                 void get_statistics(
                     Integer& max_collisions,
                     Number& avg_collisions,
@@ -876,10 +876,10 @@ class Synth : public Midi::EventHandler, public SignalProducer
                 static constexpr Integer MULTIPLIER = 125123;
                 static constexpr Integer SHIFT = 14;
 
-                static Integer hash(char const* name) noexcept;
+                static Integer hash(std::string const& name) noexcept;
 
                 void lookup(
-                    char const* name,
+                    std::string const& name,
                     Entry** root,
                     Entry** parent,
                     Entry** entry
