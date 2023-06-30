@@ -98,7 +98,7 @@ static constexpr char const* FST_OP_CODE_NAMES[FST_OP_CODE_NAMES_LEN] = {
     "UNKNOWN-65",                   // 65
     "GetMidiNoteName",              // 66
     "UNKNOWN-67",                   // 67
-    "UNKNOWN-67",                   // 67
+    "UNKNOWN-68",                   // 68
     "GetSpeakerArrangement",        // 69
     "ShellGetNextPlugin",           // 70
     "StartProcess",                 // 71
@@ -646,7 +646,6 @@ VstIntPtr FstPlugin::get_chunk(void** chunk, bool is_preset) noexcept
 {
     size_t const current_program = bank.get_current_program_index();
 
-
     bank[current_program].import(Serializer::serialize(synth));
 
     if (is_preset) {
@@ -727,13 +726,13 @@ void FstPlugin::pitch_wheel_change(
 
 VstIntPtr FstPlugin::get_program() const noexcept
 {
-    return bank.get_current_program_index();
+    return next_program;
 }
 
 
 void FstPlugin::set_program(size_t index) noexcept
 {
-    if (index >= Bank::NUMBER_OF_PROGRAMS || index == bank.get_current_program_index()) {
+    if (index >= Bank::NUMBER_OF_PROGRAMS || index == next_program) {
         return;
     }
 
@@ -758,17 +757,13 @@ VstIntPtr FstPlugin::get_program_name(char* name, size_t index) noexcept
 
 void FstPlugin::get_program_name(char* name) noexcept
 {
-    strncpy(
-        name,
-        bank[bank.get_current_program_index()].get_name().c_str(),
-        kVstMaxProgNameLen - 1
-    );
+    strncpy(name, bank[next_program].get_name().c_str(), kVstMaxProgNameLen - 1);
 }
 
 
 void FstPlugin::set_program_name(const char* name)
 {
-    bank[bank.get_current_program_index()].set_name(name);
+    bank[next_program].set_name(name);
 }
 
 
@@ -824,7 +819,7 @@ FstPlugin::Parameter::Parameter()
     : midi_controller(NULL),
     name("unknown"),
     controller_id(0),
-    // change_index(-1),
+    // change_index(-1), /* See FstPlugin::generate_samples() */
     value(0.5f),
     is_dirty_(false)
 {
@@ -838,7 +833,7 @@ FstPlugin::Parameter::Parameter(
 ) : midi_controller(midi_controller),
     name(name),
     controller_id(controller_id),
-    // change_index(-1),
+    // change_index(-1), /* See FstPlugin::generate_samples() */
     value(0.5f),
     is_dirty_(false)
 {
@@ -849,7 +844,7 @@ FstPlugin::Parameter::Parameter(Parameter const& parameter)
     : midi_controller(parameter.midi_controller),
     name(parameter.name),
     controller_id(parameter.controller_id),
-    // change_index(-1),
+    // change_index(-1), /* See FstPlugin::generate_samples() */
     value(parameter.value),
     is_dirty_(parameter.is_dirty_)
 {
@@ -860,7 +855,7 @@ FstPlugin::Parameter::Parameter(Parameter const&& parameter)
     : midi_controller(parameter.midi_controller),
     name(parameter.name),
     controller_id(parameter.controller_id),
-    // change_index(-1),
+    // change_index(-1), /* See FstPlugin::generate_samples() */
     value(parameter.value),
     is_dirty_(parameter.is_dirty_)
 {
@@ -874,7 +869,7 @@ FstPlugin::Parameter& FstPlugin::Parameter::operator=(
         midi_controller = parameter.midi_controller;
         name = parameter.name;
         controller_id = parameter.controller_id;
-        // change_index = parameter.change_index;
+        // change_index = parameter.change_index; /* See FstPlugin::generate_samples() */
         value = parameter.value;
         is_dirty_ = parameter.is_dirty_;
     }
@@ -890,7 +885,7 @@ FstPlugin::Parameter& FstPlugin::Parameter::operator=(
         midi_controller = parameter.midi_controller;
         name = parameter.name;
         controller_id = parameter.controller_id;
-        // change_index = parameter.change_index;
+        // change_index = parameter.change_index; /* See FstPlugin::generate_samples() */
         value = parameter.value;
         is_dirty_ = parameter.is_dirty_;
     }
@@ -917,6 +912,7 @@ Midi::Controller FstPlugin::Parameter::get_controller_id() const noexcept
 }
 
 
+/* See FstPlugin::generate_samples() */
 // bool FstPlugin::Parameter::needs_host_update() const noexcept
 // {
     // if (UNLIKELY(midi_controller == NULL)) {
@@ -935,6 +931,7 @@ float FstPlugin::Parameter::get_value() noexcept
 
     float const value = (float)midi_controller->get_value();
 
+    /* See FstPlugin::generate_samples() */
     // change_index=  midi_controller->get_change_index();
 
     return value;
@@ -997,7 +994,7 @@ void FstPlugin::get_param_display(size_t index, char* buffer) noexcept
         if (program_index < Bank::NUMBER_OF_PROGRAMS) {
             strncpy(
                 buffer,
-                bank[program_index].get_name().c_str(),
+                bank[program_index].get_short_name().c_str(),
                 kVstMaxParamStrLen - 1
             );
         } else {

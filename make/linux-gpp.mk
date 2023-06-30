@@ -5,13 +5,28 @@ FST = $(FST_DIR)/js80p.so
 FST_MAIN_SOURCES = src/plugin/fst/so.cpp
 
 VST3 = $(VST3_DIR)/js80p.vst3
-VST3_BIN = $(BUILD_DIR)/js80p.so
 VST3_MAIN_SOURCES = src/plugin/vst3/so.cpp
 VST3_GUI_PLATFORM = kPlatformTypeX11EmbedWindowID
 VST3_PLATFORM_OBJS =
 VST3_PLUGIN_SOURCES = \
 	src/plugin/vst3/plugin.cpp \
 	src/plugin/vst3/plugin-xcb.cpp
+
+VST3_MODULE_INFO_TOOL = $(BUILD_DIR)$(DIR_SEP)vst3_module_info_tool
+VST3_MODULE_INFO_LFLAGS = -pthread -Wl,--no-as-needed -ldl
+
+DEV_PLATFORM_CLEAN = $(VST3_MODULE_INFO_TOOL)
+
+.PHONY: vst3moduleinfo
+
+vst3moduleinfo: $(VST3_MODULE_INFO_TOOL)
+
+$(VST3_MODULE_INFO_TOOL): src/plugin/vst3/moduleinfo.cpp | $(BUILD_DIR)
+	$(CPP_TARGET_PLATFORM) \
+		$(JS80P_CXXINCS) $(VST3_CXXINCS) $(VST3_CXXFLAGS) $(JS80P_CXXFLAGS) \
+		-std=c++17 \
+		$(VST3_MODULE_INFO_LFLAGS) \
+		$< -o $@
 
 GUI_PLAYGROUND = $(BUILD_DIR)/gui-playground$(SUFFIX)
 GUI_PLAYGROUND_SOURCES = src/gui/xcb-playground.cpp
@@ -23,7 +38,8 @@ OBJ_GUI_EXTRA = \
 	$(LIB_PATH)/libxcb.so \
 	$(LIB_PATH)/libxcb-render.so \
 	$(BUILD_DIR)/img_about.o \
-	$(BUILD_DIR)/img_controllers.o \
+	$(BUILD_DIR)/img_controllers1.o \
+	$(BUILD_DIR)/img_controllers2.o \
 	$(BUILD_DIR)/img_effects.o \
 	$(BUILD_DIR)/img_envelopes.o \
 	$(BUILD_DIR)/img_knob_states-controlled.o \
@@ -48,7 +64,10 @@ $(LIB_PATH)/libxcb-render.so: $(SYS_LIB_PATH)/libxcb-render.so.0 | $(LIB_PATH)
 $(BUILD_DIR)/img_about.o: gui/img/about.png | $(BUILD_DIR)
 	$(OBJCOPY) $< $@
 
-$(BUILD_DIR)/img_controllers.o: gui/img/controllers.png | $(BUILD_DIR)
+$(BUILD_DIR)/img_controllers1.o: gui/img/controllers1.png | $(BUILD_DIR)
+	$(OBJCOPY) $< $@
+
+$(BUILD_DIR)/img_controllers2.o: gui/img/controllers2.png | $(BUILD_DIR)
 	$(OBJCOPY) $< $@
 
 $(BUILD_DIR)/img_effects.o: gui/img/effects.png | $(BUILD_DIR)

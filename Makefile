@@ -35,11 +35,22 @@ JS80P_CXXFLAGS = \
 DEBUG_LOG ?=
 
 FST_DIR = $(DIST_DIR_PREFIX)-fst
-VST3_DIR = $(DIST_DIR_PREFIX)-vst3
+VST3_DIR = $(DIST_DIR_PREFIX)-vst3_single_file
 
 OBJ_GUI_PLAYGROUND = $(BUILD_DIR)/gui-playground-$(SUFFIX).o
 
-.PHONY: all check clean dirs docs fst guiplayground perf show_dist_dir_prefix vst3
+.PHONY: \
+	all \
+	check \
+	clean \
+	dirs \
+	docs \
+	fst \
+	guiplayground \
+	perf \
+	show_fst_dir \
+	show_vst3_dir \
+	vst3
 
 all: dirs fst vst3
 
@@ -204,6 +215,7 @@ PERF_TEST_BINS = $(foreach TEST,$(PERF_TESTS),$(BUILD_DIR)/$(TEST)$(EXE))
 
 TEST_CXXFLAGS = \
 	-D TEST_MAX_ARRAY_PRINT=$(TEST_MAX_ARRAY_PRINT) \
+	-D JS80P_ASSERTIONS=1 \
 	-I./tests \
 	-g
 
@@ -222,8 +234,11 @@ VST3_CXXFLAGS = \
 	-Wno-pragmas \
 	-Wno-unknown-pragmas
 
-show_dist_dir_prefix:
-	@echo $(DIST_DIR_PREFIX)
+show_fst_dir:
+	@echo $(FST_DIR)
+
+show_vst3_dir:
+	@echo $(VST3_DIR)
 
 fst: $(FST)
 
@@ -245,15 +260,15 @@ $(DOC_DIR):
 
 clean:
 	$(RM) \
+		$(DEV_PLATFORM_CLEAN) \
 		$(FST) \
 		$(FST_OBJS) \
-		$(VST3) \
-		$(VST3_BIN) \
-		$(VST3_OBJS) \
-		$(TEST_BINS) \
 		$(GUI_PLAYGROUND) \
 		$(GUI_PLAYGROUND_OBJS) \
-		$(PERF_TEST_BINS)
+		$(PERF_TEST_BINS) \
+		$(TEST_BINS) \
+		$(VST3) \
+		$(VST3_OBJS)
 	$(RM) $(DOC_DIR)/html/*.* $(DOC_DIR)/html/search/*.*
 
 check: perf $(TEST_LIBS) $(TEST_BINS) | $(BUILD_DIR)

@@ -23,8 +23,14 @@ Table of Contents
 
  * [Table of Contents](#toc)
  * [System Requirements](#system)
+    * [Dependencies on Linux](#linux-deps)
  * [Installation](#install)
+    * [FST (VST 2.4) on Windows](#fst-windows)
+    * [VST 3 Single File on Windows](#vst3-single-windows)
+    * [FST (VST 2.4) on Linux](#fst-linux)
+    * [VST 3 Single File on Linux](#vst3-single-linux)
  * [Usage](#usage)
+ * [Presets](#presets)
  * [Bugs](#bugs)
  * [Signal Chain (Simplified)](#signal)
  * [Features](#features)
@@ -48,8 +54,14 @@ System Requirements
 -------------------
 
  * Operating System: Windows 7 or newer, or Linux (e.g. Ubuntu 20.04 or newer)
- * CPU: 32 or 64 bit, SSE2 support
+ * CPU: SSE2 support, 32 bit (i686) or 64 bit (x86-64)
  * RAM: 50-200 MB, depending on buffer size
+
+Tested with [REAPER](https://www.reaper.fm/) 6.78.
+
+<a name="linux-deps"></a>
+
+### Dependencies on Linux
 
 On Linux, the `libxcb`, `libxcb-render`, and `libcairo` libraries, and either
 the `kdialog` or the `zenity` application are required to run JS80P. To install
@@ -58,22 +70,51 @@ command:
 
     sudo apt-get install libxcb1 libxcb-render0 libcairo2 zenity kdialog
 
-Tested with [REAPER](https://www.reaper.fm/) 6.78.
+Note that if you want to run the 32 bit version of JS80P on a 64 bit system,
+then you will have to install the 32 bit version of the libraries, for example:
+
+    sudo apt-get install libxcb1:i386 libxcb-render0:i386 libcairo2:i386 zenity kdialog
 
 <a name="install"></a>
 
 Installation
 ------------
 
-1. [Download a plugin archive for your platform](https://attilammagyar.github.io/js80p/).
-2. Extract the ZIP archive.
-3. Depending on which plugin type you downloaded, copy `js80p.dll` on Windows,
-   `js80p.so` on Linux to the folder where you keep your VST 2.4 plugins,
-   or copy `js80p.vst3` (on both Windows and Linux) to your VST 3 folder.
+<a name="fst-windows"></a>
 
-The `presets` folder in the archive contains a few sounds that you can load by
-clicking the _Import Patch_ icon near the top left corner of the main screen of
-the plugin.
+### FST (VST 2.4) on Windows
+
+1. [Download the plugin](https://attilammagyar.github.io/js80p/).
+2. Extract the ZIP archive.
+3. Copy the `js80p.dll` file to the directory where you keep your VST 2.4
+   plugins.
+
+<a name="vst3-single-windows"></a>
+
+### VST 3 Single File on Windows
+
+1. [Download the plugin](https://attilammagyar.github.io/js80p/).
+2. Extract the ZIP archive.
+3. Copy the `js80p.vst3` file to your VST 3 directory which is usually
+   `C:\Users\YourUserName\AppData\Local\Programs\Common\VST3`.
+
+<a name="fst-linux"></a>
+
+### FST (VST 2.4) on Linux
+
+1. [Download the plugin](https://attilammagyar.github.io/js80p/).
+2. Extract the ZIP archive.
+3. Copy the `js80p.so` file to the directory where you keep your VST 2.4
+   plugins.
+
+<a name="vst3-single-linux"></a>
+
+### VST 3 Single File on Linux
+
+1. [Download the plugin](https://attilammagyar.github.io/js80p/).
+2. Extract the ZIP archive.
+3. Copy the `js80p.vst3` file to your VST 3 directory which is usually
+   `~/.vst3`.
 
 <a name="usage"></a>
 
@@ -92,6 +133,17 @@ Usage
 
  * It is recommended to use a small buffer size for lower latency, for example,
    3-6 milliseconds, or 128 or 256 samples at 44.1 kHz sample rate.
+
+<a name="presets"></a>
+
+Presets
+-------
+
+JS80P has a few built-in presets, and in case you don't like your DAW's preset
+browser, you can load and save them as ordinary files. For each plugin type,
+you can find these presets in the `presets` folder in the ZIP archive, and you
+can load them into JS80P by clicking on the _Import Patch_ icon near the top
+left corner of the main screen of the plugin.
 
 <a name="bugs"></a>
 
@@ -172,20 +224,16 @@ Frequenctly Asked Questions
 
 ### Which distribution should I download?
 
-Due to how MIDI works in VST 3 plugins, the recommended distribution for most
-people is the 64-bit FST plugin which can be loaded into any 64-bit DAW which
-supports VST 2.4.
+You can either try the 64 bit VST 3 version if your DAW supports VST 3 plugins,
+or you can go with the 64 bit FST version if you prefer VST 2.4.
 
-If your DAW does not support VST 2.4 however, then you will need the 64-bit
-VST 3 plugin.
-
-The 32-bit versions are only needed by those who deliberately use a 32-bit DAW,
+The 32 bit versions are only needed by those who deliberately use a 32 bit DAW,
 e.g. because they want to keep using some really old plugins which are not
-available for 64-bit systems.
+available for 64 bit systems.
 
-If you are in doubt, then try the 64 bit FST version, and if your DAW doesn't
-recognize it, then try the 64 bit VST 3 version, then the 32 bit FST version,
-etc.
+If you are in doubt, then try the 64 bit VST 3 version, and if your DAW doesn't
+recognize it, then try the 64 bit FST version, then the 32 bit VST 3 version,
+and so on.
 
 Note that all versions use the same high-precision sound synthesis engine
 internally, so the CPU architecture does not affect the sound quality.
@@ -211,7 +259,7 @@ The intended way of automating JS80P's parameters is to assign a
 Learn_), and turn the corresponding knob on your MIDI keyboard while playing,
 or edit the MIDI CC events in your host application's MIDI editor.
 
-However, the VST3 plugin format requires plugins to export a proxy parameter
+However, the VST 3 plugin format requires plugins to export a proxy parameter
 for each MIDI CC message that they want to receive, and as a side-effect, these
 parameters can also be automated using the host application's usual automation
 editor. For the sake of consistency, the FST plugin also exports automatable
@@ -222,7 +270,7 @@ parameters for each supported MIDI CC message.
 For example, in both plugin types, you might assign the
 `MIDI CC 1 (Modulation Wheel)` controller to the Phase Modulation (PM)
 parameter of the synthesizer, and then add automation in the host application
-to the `MIDI CC 1 (Modulation Wheel)` (VST3) or `ModWh` (FST) parameter. JS80P
+to the `MIDI CC 1 (Modulation Wheel)` (VST 3) or `ModWh` (FST) parameter. JS80P
 will then interpret the changes of this parameter the same way as if you were
 turning the modulation wheel on a MIDI keyboard.
 
@@ -250,7 +298,7 @@ Modulation (PM)_ virtual knob in JS80P, you have to do the following steps:
 1. Click on the small triangle in the top left corner of the plugin window of
    JS80P, and select the "_Browse parameters_" menu item.
 
-2. Find the parameter named "_Vol_" (FST) or "_MIDI CC 7 (Volume)_" (VST3) in
+2. Find the parameter named "_Vol_" (FST) or "_MIDI CC 7 (Volume)_" (VST 3) in
    the browser. Click on it with the right mouse button.
 
 3. Select the "_Link to controller..._" menu item.
@@ -283,7 +331,7 @@ more complicated procedure than setting up MIDI CC:
    aftertouch.
 
 3. While holding the piano key down, find the parameter named "_Ch AT_" (FST)
-   or "_Channel Aftertouch_" (VST3) in FL Studio's browser. Click on it with
+   or "_Channel Aftertouch_" (VST 3) in FL Studio's browser. Click on it with
    the right mouse button.
 
 4. Select the "_Link to controller..._" menu item (keep holding the piano key).
@@ -351,7 +399,7 @@ Development
 The `lib/` directory contains code from the following projects:
 
  * [FST](https://git.iem.at/zmoelnig/FST)
- * [VST3 SDK](https://github.com/steinbergmedia/vst3sdk)
+ * [VST 3 SDK](https://github.com/steinbergmedia/vst3sdk)
 
 #### Linux
 

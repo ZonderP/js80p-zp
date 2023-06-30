@@ -15,8 +15,11 @@ System Requirements
 -------------------
 
  * Operating System: Windows 7 or newer, or Linux (e.g. Ubuntu 20.04 or newer)
- * CPU: 32 or 64 bit, SSE2 support
+ * CPU: SSE2 support, 32 bit (i686) or 64 bit (x86-64)
  * RAM: 50-200 MB, depending on buffer size
+
+Dependencies on Linux
+---------------------
 
 On Linux, the "libxcb", "libxcb-render", and "libcairo" libraries, and either
 the "kdialog" or the "zenity" application are required to run JS80P. To install
@@ -25,18 +28,42 @@ command:
 
     sudo apt-get install libxcb1 libxcb-render0 libcairo2 zenity kdialog
 
-Installation
-------------
+Note that if you want to run the 32 bit version of JS80P on a 64 bit system,
+then you will have to install the 32 bit version of the libraries, for example:
+
+    sudo apt-get install libxcb1:i386 libxcb-render0:i386 libcairo2:i386 zenity kdialog
+
+Installing the FST (VST 2.4) Version on Windows
+-----------------------------------------------
 
 1. Download JS80P from its website at https://attilammagyar.github.io/js80p
 2. Extract the ZIP archive.
-3. Depending on which plugin type you downloaded, copy "js80p.dll" on Windows,
-   or "js80p.so" on Linux to the folder where you keep your VST 2.4 plugins,
-   or copy "js80p.vst3" to your VST 3 folder.
+3. Copy the "js80p.dll" file to the directory where you keep your VST 2.4
+   plugins.
 
-The "presets" folder in the archive contains a few sounds that you can load by
-clicking the Import Patch icon near the top left corner of the main screen of
-the plugin.
+Installing the VST 3 Single File Version on Windows
+---------------------------------------------------
+
+1. Download JS80P from its website at https://attilammagyar.github.io/js80p
+2. Extract the ZIP archive.
+3. Copy the "js80p.vst3" file to your VST 3 directory which is usually
+   "C:\Users\YourUserName\AppData\Local\Programs\Common\VST3".
+
+Installing the FST (VST 2.4) Version on Linux
+---------------------------------------------
+
+1. Download JS80P from its website at https://attilammagyar.github.io/js80p
+2. Extract the ZIP archive.
+3. Copy the "js80p.so" file to the directory where you keep your VST 2.4
+   plugins.
+
+Installing the VST 3 Single File Version on Linux
+-------------------------------------------------
+
+1. Download JS80P from its website at https://attilammagyar.github.io/js80p
+2. Extract the ZIP archive.
+3. Copy the "js80p.vst3" file to your VST 3 directory which is usually
+   "~/.vst3".
 
 Usage
 -----
@@ -53,6 +80,16 @@ Usage
 
  * It is recommended to use a small buffer size for lower latency, for example,
    3-6 milliseconds, or 128 or 256 samples at 44.1 kHz sample rate.
+
+Presets
+-------
+
+JS80P has a few built-in presets, and in case you don't like your DAW's preset
+browser, you can load and save them as ordinary files. For each plugin type,
+you can find these presets in the "presets" folder in the ZIP archive, and you
+can load them into JS80P by clicking on the Import Patch icon near the top left
+corner of the main screen of the plugin.
+
 
 Bugs
 ----
