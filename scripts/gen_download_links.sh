@@ -12,13 +12,29 @@ main()
     local version
     local zip
 
-    find dist -name "js80p-*-*bit-*.zip" \
+    find dist -name "js80p-*-vst3_bundle.zip" \
+      | while read
+        do
+            zip="$(basename "$REPLY")"
+            version="$(zip_to_version "$zip")"
+            uri="$DOWNLOAD_URL/v$version/$zip"
+            size="$(get_size "$REPLY")"
+            cat <<HTML
+          <li>
+            VST 3 Bundle: <a class="button" href="$uri">Download ($size)</a>
+          </li>
+HTML
+        done
+
+    find dist -name "js80p-*.zip" \
+      | grep -v "js80p-.*-src\\.zip" \
+      | grep -v "js80p-.*-vst3_bundle\\.zip" \
       | sort \
       | while read
         do
             zip="$(basename "$REPLY")"
             version="$(zip_to_version "$zip")"
-            uri="$DOWNLOAD_URL/$version/$zip"
+            uri="$DOWNLOAD_URL/v$version/$zip"
             os="$(zip_to_os_name "$zip")"
             arch="$(zip_to_arch_name "$zip")"
             plugin_type="$(zip_to_plugin_type "$zip")"
@@ -35,7 +51,7 @@ HTML
         do
             zip="$(basename "$REPLY")"
             version="$(zip_to_version "$zip")"
-            uri="$DOWNLOAD_URL/$version/$zip"
+            uri="$DOWNLOAD_URL/v$version/$zip"
             size="$(get_size "$REPLY")"
             cat <<HTML
           <li>

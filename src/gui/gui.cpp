@@ -481,8 +481,8 @@ char const* const GUI::PARAMS[] = {
     [Synth::ParamId::CF1TYP] = "Carrier Filter 1 Type",
     [Synth::ParamId::CF2TYP] = "Carrier Filter 2 Type",
 
-    [Synth::ParamId::EF1TYP] = "Effects Filter 1 Type",
-    [Synth::ParamId::EF2TYP] = "Effects Filter 2 Type",
+    [Synth::ParamId::EF1TYP] = "Filter 1 Type",
+    [Synth::ParamId::EF2TYP] = "Filter 2 Type",
 
     [Synth::ParamId::L1WAV] = "LFO 1 Waveform",
     [Synth::ParamId::L2WAV] = "LFO 2 Waveform",
@@ -519,8 +519,11 @@ char const* const GUI::PARAMS[] = {
     [Synth::ParamId::MF2LOG] = "Modulator Filter 2 Logarithmic Frequency",
     [Synth::ParamId::CF1LOG] = "Carrier Filter 1 Logarithmic Frequency",
     [Synth::ParamId::CF2LOG] = "Carrier Filter 2 Logarithmic Frequency",
-    [Synth::ParamId::EF1LOG] = "Effects Filter 1 Logarithmic Frequency",
-    [Synth::ParamId::EF2LOG] = "Effects Filter 2 Logarithmic Frequency",
+    [Synth::ParamId::EF1LOG] = "Filter 1 Logarithmic Frequency",
+    [Synth::ParamId::EF2LOG] = "Filter 2 Logarithmic Frequency",
+    [Synth::ParamId::ECLOG] = "Chorus Logarithmic Filter Frequencies",
+    [Synth::ParamId::EELOG] = "Echo Logarithmic Filter Frequencies",
+    [Synth::ParamId::ERLOG] = "Reverb Logarithmic Filter Frequencies",
 
     [Synth::ParamId::N1DYN] = "Envelope 1 Dynamic",
     [Synth::ParamId::N2DYN] = "Envelope 2 Dynamic",
@@ -1412,6 +1415,7 @@ void GUI::build_effects_body(ParamEditorKnobStates* knob_states)
     PE(effects_body, 200 + PE_W * 8,   242, Synth::ParamId::ECWET,  MFL_C,      "%.2f", 100.0, knob_states);
     PE(effects_body, 200 + PE_W * 9,   242, Synth::ParamId::ECDRY,  MFL_C,      "%.2f", 100.0, knob_states);
     TS(effects_body, 670, 215, 111, 87, Synth::ParamId::ECSYN);
+    TS(effects_body, 450, 215,  96,  0, Synth::ParamId::ECLOG);
 
     PE(effects_body,  34 + PE_W * 0,   428, Synth::ParamId::EEDEL,  MFL__,      "%.3f", 1.0, knob_states);
     PE(effects_body,  34 + PE_W * 1,   428, Synth::ParamId::EEFB,   MFL_C,      "%.2f", 100.0, knob_states);
@@ -1422,6 +1426,7 @@ void GUI::build_effects_body(ParamEditorKnobStates* knob_states)
     PE(effects_body,  34 + PE_W * 6,   428, Synth::ParamId::EEWET,  MFL_C,      "%.2f", 100.0, knob_states);
     PE(effects_body,  34 + PE_W * 7,   428, Synth::ParamId::EEDRY,  MFL_C,      "%.2f", 100.0, knob_states);
     TS(effects_body, 388, 401, 111, 87, Synth::ParamId::EESYN);
+    TS(effects_body, 169, 401,  96,  0, Synth::ParamId::EELOG);
 
     PE(effects_body, 540 + PE_W * 0,   428, Synth::ParamId::ERRS,   MFL_C,      "%.2f", 100.0, knob_states);
     PE(effects_body, 540 + PE_W * 1,   428, Synth::ParamId::ERDF,   MFL__,      "%.1f", 1.0, knob_states);
@@ -1430,6 +1435,7 @@ void GUI::build_effects_body(ParamEditorKnobStates* knob_states)
     PE(effects_body, 540 + PE_W * 4,   428, Synth::ParamId::ERHPF,  MFL__,      "%.1f", 1.0, knob_states);
     PE(effects_body, 540 + PE_W * 5,   428, Synth::ParamId::ERWET,  MFL_C,      "%.2f", 100.0, knob_states);
     PE(effects_body, 540 + PE_W * 6,   428, Synth::ParamId::ERDRY,  MFL_C,      "%.2f", 100.0, knob_states);
+    TS(effects_body, 613, 401,  96,  0, Synth::ParamId::ERLOG);
 
     effects_body->hide();
 }

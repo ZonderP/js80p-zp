@@ -28,7 +28,7 @@ $(VST3_MODULE_INFO_TOOL): src/plugin/vst3/moduleinfo.cpp | $(BUILD_DIR)
 		$(VST3_MODULE_INFO_LFLAGS) \
 		$< -o $@
 
-GUI_PLAYGROUND = $(BUILD_DIR)/gui-playground$(SUFFIX)
+GUI_PLAYGROUND = $(BUILD_DIR)/gui-playground-$(SUFFIX)
 GUI_PLAYGROUND_SOURCES = src/gui/xcb-playground.cpp
 GUI_TARGET_PLATFORM_HEADERS = src/gui/xcb.hpp
 GUI_TARGET_PLATFORM_SOURCES = src/gui/xcb.cpp
@@ -48,6 +48,8 @@ OBJ_GUI_EXTRA = \
 	$(BUILD_DIR)/img_lfos.o \
 	$(BUILD_DIR)/img_synth.o \
 	$(BUILD_DIR)/img_vst_logo.o
+
+UPGRADE_PATCH = $(BUILD_DIR)/upgrade-patch-$(SUFFIX)
 
 $(LIB_PATH): | $(BUILD_DIR)
 	$(MKDIR) $@
@@ -122,6 +124,7 @@ TARGET_PLATFORM_LFLAGS = \
 LINK_FST = $(LINK_SO)
 LINK_VST3 = $(LINK_SO)
 LINK_GUI_PLAYGROUND = $(LINK_EXE)
+LINK_UPGRADE_PATCH = $(LINK_EXE)
 
 TARGET_PLATFORM_CXXFLAGS = \
     $(ARCH_CXXFLAGS) \
