@@ -323,11 +323,11 @@ void ControllerSelector::set_up(GUI::PlatformData platform_data, WidgetBase* par
 
         top += Controller::HEIGHT;
 
-        if (i == 0 || i == 4 || i == 5 || i == 74 || i == 94 || i == 102) {
+        if (i == 0 || i == 4 || i == 5 || i == 75 || i == 95 || i == 103) {
             top += group_separation;
         }
 
-        if (top > max_top || i == 84) {
+        if (top > max_top || i == 85) {
             top = TITLE_HEIGHT;
             left += Controller::WIDTH;
         }
@@ -1104,11 +1104,25 @@ bool ParamEditor::Knob::mouse_wheel(Number const delta, bool const modifier)
 }
 
 
-AboutText::AboutText(GUI::Image logo)
+AboutText::AboutText(char const* sdk_version, GUI::Image logo)
     : Widget(TEXT, LEFT, TOP, WIDTH, HEIGHT, Type::ABOUT_TEXT),
     logo(logo)
 {
-    std::string line = "";
+    std::string line("(Version: ");
+
+    line += VERSION;
+
+    if (sdk_version != NULL) {
+        line += ", SDK: ";
+        line += sdk_version;
+    }
+
+    line += ")";
+
+    lines.push_back(NAME);
+    lines.push_back(line);
+
+    line = "";
 
     for (char const* c = TEXT; *c != '\x00'; ++c) {
         if (*c == '\n') {

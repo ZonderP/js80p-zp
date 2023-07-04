@@ -41,7 +41,16 @@ class FstPlugin : public Midi::EventHandler
     public:
         static constexpr VstInt32 OUT_CHANNELS = (VstInt32)Synth::OUT_CHANNELS;
         static constexpr VstInt32 VERSION = JS80P::Constants::PLUGIN_VERSION_INT;
-        static constexpr VstInt32 NUMBER_OF_PARAMETERS = 71;
+        static constexpr VstInt32 NUMBER_OF_PARAMETERS = 72;
+
+        static constexpr char const* FST_H_VERSION = (
+            "FST "
+            JS80P_TO_STRING(FST_MAJOR_VERSION)
+            "."
+            JS80P_TO_STRING(FST_MINOR_VERSION)
+            "."
+            JS80P_TO_STRING(FST_MICRO_VERSION)
+        );
 
         static AEffect* create_instance(
             audioMasterCallback const host_callback,

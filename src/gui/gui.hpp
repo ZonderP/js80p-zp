@@ -92,7 +92,7 @@ class GUI
         static constexpr Frequency REFRESH_RATE = 18.0;
         static constexpr Seconds REFRESH_RATE_SECONDS = 1.0 / REFRESH_RATE;
 
-        static constexpr int CONTROLLERS_COUNT = 109;
+        static constexpr int CONTROLLERS_COUNT = 110;
 
         static char const* const MODES[];
         static int const MODES_COUNT;
@@ -162,6 +162,7 @@ class GUI
         static Color controller_id_to_bg_color(Synth::ControllerId const controller_id);
 
         GUI(
+            char const* sdk_version,
             PlatformData platform_data,
             PlatformWidget parent_window,
             Synth& synth,
@@ -205,7 +206,7 @@ class GUI
         void initialize();
         void destroy();
 
-        void build_about_body();
+        void build_about_body(char const* sdk_version);
         void build_controllers_1_body(ParamEditorKnobStates* knob_states);
         void build_controllers_2_body(ParamEditorKnobStates* knob_states);
         void build_effects_body(ParamEditorKnobStates* knob_states);
