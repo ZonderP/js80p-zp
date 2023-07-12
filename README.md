@@ -10,19 +10,20 @@ To download JS80P, visit its website at
 
 <img src="https://raw.githubusercontent.com/attilammagyar/js80p/master/js80p.png" alt="Screenshot of JS80P" />
 
-The source code is available at https://github.com/attilammagyar/js80p under
-the terms of the GNU General Public License Version 3.
+The source code is available at
+[https://github.com/attilammagyar/js80p](https://github.com/attilammagyar/js80p)
+under the terms of the GNU General Public License Version 3.
 
 > VST® is a trademark of Steinberg Media Technologies GmbH, registered in
 > Europe and other countries.
 
-<a name="toc"></a>
+<a id="toc"></a>
 
 Table of Contents
 -----------------
 
  * [Table of Contents](#toc)
- * [System Requirements](#system)
+ * [System Requirements](#system-reqs)
     * [Dependencies on Linux](#linux-deps)
  * [Installation](#install)
     * [VST 3 Bundle on Windows](#vst3-bundle-windows)
@@ -33,6 +34,34 @@ Table of Contents
     * [FST (VST 2.4) on Linux](#fst-linux)
  * [Usage](#usage)
  * [Presets](#presets)
+    * [Blank](#preset-blank)
+    * [Bright Organ](#preset-bright-organ)
+    * [Chariots-Aftertouch](#preset-chariots-aftertouch)
+    * [Chariots](#preset-chariots)
+    * [Demo 1](#preset-demo-1)
+    * [Demo 2](#preset-demo-2)
+    * [Kalimba](#preset-kalimba)
+    * [Rock Organ](#preset-rock-organ)
+    * [Sandstorm](#preset-sandstorm)
+    * [Stereo Saw](#preset-stereo-saw)
+    * [Acid Lead 1](#preset-acid-lead-1)
+    * [Acid Lead 2](#preset-acid-lead-2)
+    * [Acid Lead 3](#preset-acid-lead-3)
+    * [Bells 1](#preset-bells-1)
+    * [Bells 2](#preset-bells-2)
+    * [Flute](#preset-flute)
+    * [FM Womp 1](#preset-fm-womp-1)
+    * [FM Womp 2](#preset-fm-womp-2)
+    * [FM Womp 3](#preset-fm-womp-3)
+    * [Tech Noir Lead 1](#preset-tech-noir-lead-1)
+    * [Tech Noir Lead 2](#preset-tech-noir-lead-2)
+    * [Tech Noir Lead 3](#preset-tech-noir-lead-3)
+    * [Derezzed](#preset-derezzed)
+    * [Ambient Pad 1](#preset-ambient-pad-1)
+    * [Ambient Pad 2](#preset-ambient-pad-2)
+    * [Ambient Pad 3](#preset-ambient-pad-3)
+    * [Saw Piano](#preset-saw-piano)
+    * [Saw Piano Reversed](#preset-saw-piano-reversed)
  * [Bugs](#bugs)
  * [Signal Chain (Simplified)](#signal)
  * [Features](#features)
@@ -41,17 +70,18 @@ Table of Contents
     * [Mac version?](#faq-mac)
     * [The knobs in the Custom Waveform harmonics secion don't do anything, is this a bug?](#faq-custom-wave)
     * [How can parameters be automated? What parameters does the plugin export?](#faq-automation)
-    * [How to assign a MIDI CC to a JS80P parameter in FL Studio?](#faq-flstudio-midicc)
-    * [How to assign Channel Pressure (Aftertouch) to a JS80P parameter in FL Studio?](#faq-flstudio-aftertouch)
     * [Aren't Phase Modulation and Frequency Modulation equivalent? Why have both?](#faq-pm-fm)
     * [Where does the name come from?](#faq-name)
+    * [FL Studio: How to assign a MIDI CC to a JS80P parameter?](#faq-flstudio-midicc)
+    * [FL Studio: How to assign Channel Pressure (Aftertouch) to a JS80P parameter?](#faq-flstudio-aftertouch)
+    * [FL Studio: How to use the Sustain Pedal?](#faq-flstudio-sustain)
  * [Development](#dev)
     * [Tools](#dev-tools)
     * [Dependencies](#dev-dep)
     * [Compiling](#dev-compile)
     * [Theory](#dev-theory)
 
-<a name="system"></a>
+<a id="system-reqs"></a>
 
 System Requirements
 -------------------
@@ -62,7 +92,7 @@ System Requirements
 
 Tested with [REAPER](https://www.reaper.fm/) 6.79.
 
-<a name="linux-deps"></a>
+<a id="linux-deps"></a>
 
 ### Dependencies on Linux
 
@@ -78,7 +108,7 @@ then you will have to install the 32 bit version of the libraries, for example:
 
     sudo apt-get install libxcb1:i386 libxcb-render0:i386 libcairo2:i386 zenity kdialog
 
-<a name="install"></a>
+<a id="install" href="#toc">Table of Contents</a>
 
 Installation
 ------------
@@ -94,7 +124,7 @@ matches the CPU architecture for which your plugin host application was built.
 (For example, some 32 bit (i686) versions of Reaper are known to be unable to
 recognize VST 3 bundles when running on a 64 bit system.)
 
-<a name="vst3-bundle-windows"></a>
+<a id="vst3-bundle-windows"></a>
 
 ### VST 3 Bundle on Windows
 
@@ -103,7 +133,7 @@ recognize VST 3 bundles when running on a 64 bit system.)
 3. Copy the entire `js80p.vst3` directory to your VST 3 directory which is
    usually `C:\Users\YourUserName\AppData\Local\Programs\Common\VST3`.
 
-<a name="vst3-bundle-linux"></a>
+<a id="vst3-bundle-linux"></a>
 
 ### VST 3 Bundle on Linux
 
@@ -112,7 +142,7 @@ recognize VST 3 bundles when running on a 64 bit system.)
 3. Copy the entire `js80p.vst3` directory to your VST 3 directory which is
    usually `~/.vst3`.
 
-<a name="vst3-single-windows"></a>
+<a id="vst3-single-windows"></a>
 
 ### VST 3 Single File on Windows
 
@@ -121,7 +151,7 @@ recognize VST 3 bundles when running on a 64 bit system.)
 3. Copy the `js80p.vst3` file to your VST 3 directory which is usually
    `C:\Users\YourUserName\AppData\Local\Programs\Common\VST3`.
 
-<a name="vst3-single-linux"></a>
+<a id="vst3-single-linux"></a>
 
 ### VST 3 Single File on Linux
 
@@ -130,7 +160,7 @@ recognize VST 3 bundles when running on a 64 bit system.)
 3. Copy the `js80p.vst3` file to your VST 3 directory which is usually
    `~/.vst3`.
 
-<a name="fst-windows"></a>
+<a id="fst-windows"></a>
 
 ### FST (VST 2.4) on Windows
 
@@ -139,7 +169,7 @@ recognize VST 3 bundles when running on a 64 bit system.)
 3. Copy the `js80p.dll` file to the directory where you keep your VST 2.4
    plugins.
 
-<a name="fst-linux"></a>
+<a id="fst-linux"></a>
 
 ### FST (VST 2.4) on Linux
 
@@ -148,7 +178,7 @@ recognize VST 3 bundles when running on a 64 bit system.)
 3. Copy the `js80p.so` file to the directory where you keep your VST 2.4
    plugins.
 
-<a name="usage"></a>
+<a id="usage" href="#toc">Table of Contents</a>
 
 Usage
 -----
@@ -166,7 +196,7 @@ Usage
  * It is recommended to use a small buffer size for lower latency, for example,
    3-6 milliseconds, or 128 or 256 samples at 44.1 kHz sample rate.
 
-<a name="presets"></a>
+<a id="presets" href="#toc">Table of Contents</a>
 
 Presets
 -------
@@ -177,7 +207,232 @@ each plugin type, you can find these presets in the `presets` folder in the ZIP
 archive, and you can load them into JS80P by clicking on the _Import Patch_
 icon near the top left corner of the main screen of the plugin.
 
-<a name="bugs"></a>
+<a id="preset-blank"></a>
+
+### Blank
+
+The default, empty patch, a blank canvas.
+
+<a id="preset-bright-organ"></a>
+
+### Bright Organ
+
+A bright, clean, Hammond-like organ sound. Aftertouch and mod wheel increase
+the vibrato. The softer you play, the slower the attack, the harder you play,
+the harder the attack.
+
+<a id="preset-chariots-aftertouch"></a>
+
+### Chariots-Aftertouch
+
+A Vangelis-inspired split keyboard patch. Notes below C3 are modulated with
+and inverse sawtooth LFO, notes above C3 get some wavefolding treatment if
+you use aftertouch. The mod wheel controls the vibrato of notes above C3, and
+the pitch wheel also affects only these notes.
+
+<a id="preset-chariots"></a>
+
+### Chariots
+
+A Vangelis-inspired split keyboard patch. Notes below C3 are modulated with
+and inverse sawtooth LFO, notes above C3 get some wavefolding treatment,
+depending on the velocity. The harder you play, the longer it takes for the
+wavefolder to kick in. The mod wheel controls the vibrato of notes above
+C3, and the pitch wheel also affects only these notes.
+
+<a id="preset-demo-1"></a>
+
+### Demo 1
+
+The patch from the first demo video of JS80P. The mod wheel makes the sound
+brighter, the volume knob (CC 7) adjusts the inverse sawtooth LFO which
+controls the filter before the wavefolder.
+
+<a id="preset-demo-2"></a>
+
+### Demo 2
+
+The patch from the second demo video of JS80P. This split keyboard patch has
+slow tremolo bass notes below Gb3, with extremely long release (just press a
+key, and you're good for about 2 measures with your left hand being free, even
+without a sustain pedal), and plucky lead notes, with the mod wheel and the
+volume knob (CC 7) controlling the timbre. (However, it is not recommended
+with this patch to adjust the mod wheel while a right hand note is playing.)
+
+<a id="preset-kalimba"></a>
+
+### Kalimba
+
+A simple kalimba sound with percussive attack and short decay. The sustain
+pedal adds more reverb and echo, and lengthens note decay.
+
+<a id="preset-rock-organ"></a>
+
+### Rock Organ
+
+A little darker, overdriven Hammond-like organ sound. Aftertouch and mod wheel
+increase the vibrato. The softer you play, the slower the attack, the harder
+you play, the harder the attack.
+
+<a id="preset-sandstorm"></a>
+
+### Sandstorm
+
+A dirty, harsh, detuned FM lead sound. Mod wheel and aftertouch make it even
+dirtier and harsher.
+
+<a id="preset-stereo-saw"></a>
+
+### Stereo Saw
+
+A little bit metallic sounding sawtooth wave. Note velocity slightly affects
+the timbre, mod wheel and aftertouch add wavefolding. The volume knob
+adjusts an LFO which controls filter resonance.
+
+<a id="preset-acid-lead-1"></a>
+
+### Acid Lead 1
+
+Sawtooth wave based acid lead sound. Aftertouch and mod wheel increase
+the vibrato, the sustain pedal lengthens the decay.
+
+<a id="preset-acid-lead-2"></a>
+
+### Acid Lead 2
+
+Square wave based acid lead sound. Aftertouch and mod wheel increase
+the vibrato, the sustain pedal lengthens the decay.
+
+<a id="preset-acid-lead-3"></a>
+
+### Acid Lead 3
+
+Another sawtooth wave based acid lead sound. Aftertouch and mod wheel increase
+the vibrato, the sustain pedal lengthens the decay.
+
+<a id="preset-bells-1"></a>
+
+### Bells 1
+
+A bright bell sound. Aftertouch and mod wheel increase the vibrato,
+the sustain pedal lengthens the decay.
+
+<a id="preset-bells-2"></a>
+
+### Bells 2
+
+A slightly darker bell sound. Aftertouch and mod wheel increase the vibrato,
+the sustain pedal lengthens the decay.
+
+<a id="preset-flute"></a>
+
+### Flute
+
+A synth flute sound with a couple of tricks: the pitch of the notes decreases
+slightly when they end, and the mod wheel adds a little embellishment to the
+beginning of each note. Aftertouch adds more emphasis to the note.
+
+<a id="preset-fm-womp-1"></a>
+
+### FM Womp 1
+
+A clean FM sound where the modulator and the carrier use different envelopes,
+so the notes start with a slight "wah" effect. Aftertouch and mod wheel
+increase the vibrato. Aftertouch also adds more modulation.
+
+<a id="preset-fm-womp-2"></a>
+
+### FM Womp 2
+
+A slightly distorted FM sound where the modulator and the carrier use
+different envelopes, so the notes start with a slight "wah" effect. Aftertouch
+and mod wheel increase the vibrato. Aftertouch also adds more modulation,
+making the sound brighter and more distorted.
+
+<a id="preset-fm-womp-3"></a>
+
+### FM Womp 3
+
+A more distorted FM sound where the modulator and the carrier use different
+envelopes, so the notes start with a slight "wah" effect. Aftertouch and mod
+wheel increase the vibrato. Aftertouch also adds more modulation, making the
+sound brighter and more distorted.
+
+<a id="preset-tech-noir-lead-1"></a>
+
+### Tech Noir Lead 1
+
+A brass sound for futuristic sci-fi dystopias with a slower filter sweep at
+the beginning of notes, depending on note velocity. Mod wheel adds vibrato,
+aftertouch adds emphasis and brightness.
+
+<a id="preset-tech-noir-lead-2"></a>
+
+### Tech Noir Lead 2
+
+A brass sound for futuristic sci-fi dystopias with a harsher filter sweep at
+the beginning of notes, depending on note velocity. Mod wheel adds vibrato,
+aftertouch adds emphasis and brightness.
+
+<a id="preset-tech-noir-lead-3"></a>
+
+### Tech Noir Lead 3
+
+A darker brass sound for futuristic sci-fi dystopias with a filter sweep at
+the beginning of notes, depending on note velocity. Mod wheel adds vibrato,
+aftertouch adds emphasis and brightness.
+
+<a id="preset-derezzed"></a>
+
+### Derezzed
+
+This Daft Punk inspired patch is built around sawtooth waves with lots of
+distortions. Mod wheel makes upcoming notes brighter (without affecting
+the currently sounding ones), and it increases the distortion. Aftertouch
+adds vibrato.
+
+<a id="preset-ambient-pad-1"></a>
+
+### Ambient Pad 1
+
+Slowly evolving pad sound with sci-fi vibe. The mod wheel destabilizes
+the tuning, the aftertouch increases that effect, and adds slight distortions.
+
+<a id="preset-ambient-pad-2"></a>
+
+### Ambient Pad 2
+
+Slowly evolving pad sound with a dark sci-fi vibe. The mod wheel destabilizes
+the tuning, the aftertouch increases that effect, and adds slight distortions.
+
+<a id="preset-ambient-pad-3"></a>
+
+### Ambient Pad 3
+
+Slowly evolving pad sound with a dark sci-fi vibe. The mod wheel destabilizes
+the tuning, the aftertouch increases that effect, and adds ghostly, distant
+screams.
+
+<a id="preset-saw-piano"></a>
+
+### Saw Piano
+
+A sawtooth wave based sound where high notes decay quickly, lower notes
+decay slowly, but decay time is also affected by note velocity. The harder
+you play, the brighter and richer the timbre, and the harder the note attack.
+Mod wheel controls the vibrato, and aftertouch controls filtering. The
+sustain pedal lengthens note decay.
+
+<a id="preset-saw-piano-reversed"></a>
+
+### Saw Piano Reversed
+
+A sawtooth wave based sound which sounds like as if you were playing
+a recording backwards. The time it takes for notes to un-decay depends on
+note pitch and velocity. The harder you play, the brighter and richer the
+sound gets. Mod wheel controls the vibrato, aftertouch adjusts the filtering.
+
+<a id="bugs" href="#toc">Table of Contents</a>
 
 Bugs
 ----
@@ -185,7 +440,7 @@ Bugs
 If you find bugs, please report them at
 [https://github.com/attilammagyar/js80p/issues](https://github.com/attilammagyar/js80p/issues).
 
-<a name="signal"></a>
+<a id="signal" href="#toc">Table of Contents</a>
 
 Signal Chain (Simplified)
 -------------------------
@@ -203,7 +458,7 @@ Signal Chain (Simplified)
     v
     Distortion --> Filter --> Filter --> Chorus --> Echo --> Reverb --> Out
 
-<a name="features"></a>
+<a id="features" href="#toc">Table of Contents</a>
 
 Features
 --------
@@ -252,7 +507,7 @@ Features
 Frequenctly Asked Questions
 ---------------------------
 
-<a name="faq-which"></a>
+<a id="faq-which"></a>
 
 ### Which distribution should I download?
 
@@ -278,7 +533,7 @@ application doesn't recognize it, then try the 64 bit VST 3 version, then the
 Note that all versions use the same high-precision sound synthesis engine
 internally, so the CPU architecture does not affect the sound quality.
 
-<a name="faq-mac"></a>
+<a id="faq-mac" href="#toc">Table of Contents</a>
 
 ### Mac version?
 
@@ -290,7 +545,7 @@ machine that could be used for testing, I'd consider that. But as long as it
 cannot be obtained (legally) without also buying a Mac, and I'm happy with my
 current computer, I'm not going to invest in a new one.
 
-<a name="faq-custom-wave"></a>
+<a id="faq-custom-wave" href="#toc">Table of Contents</a>
 
 ### The knobs in the Custom Waveform harmonics secion don't do anything, is this a bug?
 
@@ -302,7 +557,7 @@ sample accurate, they are not smoothed, and they are processed only once for
 each rendering block. Due to this, if you change them while a note is playing,
 or assign a controller to them, then you might hear "steps" or even clicks.)
 
-<a name="faq-automation"></a>
+<a id="faq-automation" href="#toc">Table of Contents</a>
 
 ### How can parameters be automated? What parameters does the plugin export?
 
@@ -326,9 +581,36 @@ to the `MIDI CC 1 (Modulation Wheel)` (VST 3) or `ModWh` (FST) parameter. JS80P
 will then interpret the changes of this parameter the same way as if you were
 turning the modulation wheel on a MIDI keyboard.
 
-<a name="faq-flstudio-midicc"></a>
+<a id="faq-pm-fm" href="#toc">Table of Contents</a>
 
-### How to assign a MIDI CC to a JS80P parameter in FL Studio?
+### Aren't Phase Modulation and Frequency Modulation equivalent? Why have both?
+
+The reason for JS80P having both kinds of modulation is that they are not
+always equivalent. They are only identical when the modulator signal is a
+sinusoid, but with each added harmonic, PM and FM start to differ more and
+more. A detailed mathematical explanation of this is shown in
+[pm-fm-equivalence.md](https://github.com/attilammagyar/js80p/blob/main/pm-fm-equivalence.md).
+
+<a id="faq-name" href="#toc">Table of Contents</a>
+
+### Where does the name come from?
+
+In 2022, I started developing a browser-based synthesizer using the [Web Audio
+API][webaudio], mostly being inspired by the [Yamaha CS-80][cs80]. I named that
+project [JS-80][js80]. Then I started adding one little feature and
+customization option after the other, then it got out of hand, and I also
+started finding limitations of doing audio in the browser. So I decided to
+implement a cleaned up version of this synth in C++ as a DAW plugin (with a
+better waveshaper antialiasing method than what's available in the browser),
+and so JS80P was born.
+
+  [webaudio]: https://www.w3.org/TR/webaudio/
+  [cs80]: https://en.wikipedia.org/wiki/Yamaha_CS-80
+  [js80]: https://attilammagyar.github.io/toys/js-80/
+
+<a id="faq-flstudio-midicc" href="#toc">Table of Contents</a>
+
+### FL Studio: How to assign a MIDI CC to a JS80P parameter?
 
 Unlike decent audio software (like for example
 [REAPER](https://www.reaper.fm/)), [FL Studio](https://www.image-line.com/fl-studio/)
@@ -363,9 +645,9 @@ Modulation (PM)_ virtual knob in JS80P, you have to do the following steps:
 6. Select either the "_MIDI CC 7 (Volume)_" option, or the "_MIDI Learn_"
    option, and turn the physical knob on your MIDI keyboard again.
 
-<a name="faq-flstudio-aftertouch"></a>
+<a id="faq-flstudio-aftertouch" href="#toc">Table of Contents</a>
 
-### How to assign Channel Pressure (Aftertouch) to a JS80P parameter in FL Studio?
+### FL Studio: How to assign Channel Pressure (Aftertouch) to a JS80P parameter?
 
 Unlike decent audio software (like for example
 [REAPER](https://www.reaper.fm/)), [FL Studio](https://www.image-line.com/fl-studio/)
@@ -395,39 +677,45 @@ more complicated procedure than setting up MIDI CC:
 
 7. Select the "_Channel Aftertouch_" option.
 
-<a name="faq-pm-fm"></a>
+<a id="faq-flstudio-sustain" href="#toc">Table of Contents</a>
 
-### Aren't Phase Modulation and Frequency Modulation equivalent? Why have both?
+### FL Studio: How to use the Sustain Pedal?
 
-The reason for JS80P having both kinds of modulation is that they are not
-always equivalent. They are only identical when the modulator signal is a
-sinusoid, but with each added harmonic, PM and FM start to differ more and
-more. A detailed mathematical explanation of this is shown in
-[pm-fm-equivalence.md](pm-fm-equivalence.md).
+Unlike decent audio software (like for example
+[REAPER](https://www.reaper.fm/)), [FL Studio](https://www.image-line.com/fl-studio/)
+does not send all MIDI events that come out of your MIDI keyboard to plugins,
+and unfortunately, the [MIDI Control Change (MIDI CC)][midicc2] message which
+contains information about the sustain pedal's state is among the kinds of MIDI
+data that it swallows. To make everything work, you have to assign the sustain
+pedal's MIDI CC events to the plugin parameter where JS80P expects them.
 
-<a name="faq-name"></a>
+  [midicc2]: https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 
-### Where does the name come from?
+1. Open "_Options / MIDI settings_" from the main menu.
 
-In 2022, I started developing a browser-based synthesizer using the [Web Audio
-API][webaudio], mostly being inspired by the [Yamaha CS-80][cs80]. I named that
-project [JS-80][js80]. Then I started adding one little feature and
-customization option after the other, then it got out of hand, and I also
-started finding limitations of doing audio in the browser. So I decided to
-implement a cleaned up version of this synth in C++ as a DAW plugin (with a
-better waveshaper antialiasing method than what's available in the browser),
-and so JS80P was born.
+2. Turn off the "_Foot pedal controls note off_" option.
 
-  [webaudio]: https://www.w3.org/TR/webaudio/
-  [cs80]: https://en.wikipedia.org/wiki/Yamaha_CS-80
-  [js80]: https://attilammagyar.github.io/toys/js-80/
+3. Close the _Settings_ dialog window.
 
-<a name="dev"></a>
+4. Click on the small triangle in the top left corner of the plugin window of
+   JS80P, and select the "_Browse parameters_" menu item.
+
+5. Find the parameter named "_Sustn_" (FST) or "_MIDI CC 64 (Sustain Pedal)_"
+   (VST 3) in the browser. Click on it with the right mouse button.
+
+6. Select the "_Link to controller..._" menu item.
+
+7. Press the pedal.
+
+<a id="dev" href="#toc">Table of Contents</a>
 
 Development
 -----------
 
-<a name="dev-tools"></a>
+This section contains information for those who downloaded the source code of
+JS80P and want to compile it themselves.
+
+<a id="dev-tools"></a>
 
 ### Tools
 
@@ -444,7 +732,7 @@ Development
  * [WinLibs MinGW-w64 7.0.0+ (MSVCRT)](https://winlibs.com/)
  * [Doxygen 1.8.17+](https://www.doxygen.nl/)
 
-<a name="dev-dep"></a>
+<a id="dev-dep"></a>
 
 ### Dependencies
 
@@ -452,6 +740,9 @@ The `lib/` directory contains code from the following projects:
 
  * [FST](https://git.iem.at/zmoelnig/FST)
  * [VST 3 SDK](https://github.com/steinbergmedia/vst3sdk)
+
+Note that the `lib/` directory does not include the whole SDK packages, it only
+contains what's required for compiling JS80P.
 
 #### Linux
 
@@ -474,7 +765,7 @@ following packages need to be installed:
         libxcb-render0-dev:i386 \
         mingw-w64
 
-<a name="dev-compile"></a>
+<a id="dev-compile"></a>
 
 ### Compiling
 
@@ -502,7 +793,7 @@ The following commands (on a 64 bit Linux environment) will compile JS80P for
     TARGET_PLATFORM=x86_64-gpp make all
     TARGET_PLATFORM=i686-gpp make all
 
-<a name="dev-theory"></a>
+<a id="dev-theory" href="#toc">Table of Contents</a>
 
 ### Theory
 
@@ -534,3 +825,5 @@ The following commands (on a 64 bit Linux environment) will compile JS80P for
  * [Multiply-with-carry pseudorandom number generator](https://en.wikipedia.org/wiki/Multiply-with-carry_pseudorandom_number_generator)
 
  * [The World's Smallest Hash Table by Orson Peters](https://orlp.net/blog/worlds-smallest-hash-table/)
+
+<a href="#toc">Table of Contents</a>

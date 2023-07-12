@@ -60,9 +60,14 @@ class Synth : public Midi::EventHandler, public SignalProducer
 {
     friend class SignalProducer;
 
+    private:
+        static constexpr Integer NEXT_VOICE_MASK = 0x3f;
+
     public:
         typedef Voice<SignalProducer> Modulator;
         typedef Voice<Modulator::ModulationOut> Carrier;
+
+        static constexpr Integer POLYPHONY = NEXT_VOICE_MASK + 1;
 
         static constexpr Integer OUT_CHANNELS = Carrier::CHANNELS;
 
@@ -700,8 +705,10 @@ class Synth : public Midi::EventHandler, public SignalProducer
             ControllerId const controller_id
         ) noexcept;
 
-        Synth() noexcept;
+        Synth(Integer const samples_between_gc = 8000) noexcept;
         virtual ~Synth() override;
+
+        virtual void set_sample_rate(Frequency const new_sample_rate) noexcept override;
 
         bool is_lock_free() const noexcept;
 
@@ -786,16 +793,6 @@ class Synth : public Midi::EventHandler, public SignalProducer
             Midi::Channel const channel,
             Midi::Controller const controller,
             Midi::Byte const new_value
-        ) noexcept;
-
-        void sustain_on(
-            Seconds const time_offset,
-            Midi::Channel const channel
-        ) noexcept;
-
-        void sustain_off(
-            Seconds const time_offset,
-            Midi::Channel const channel
         ) noexcept;
 
         void channel_pressure(
@@ -1030,9 +1027,6 @@ class Synth : public Midi::EventHandler, public SignalProducer
         static constexpr Number MIDI_WORD_SCALE = 1.0 / 16384.0;
         static constexpr Number MIDI_BYTE_SCALE = 1.0 / 127.0;
 
-        static constexpr Integer NEXT_VOICE_MASK = 0x3f;
-        static constexpr Integer POLYPHONY = NEXT_VOICE_MASK + 1;
-
         static constexpr Integer INVALID_VOICE = -1;
 
         static std::vector<bool> supported_midi_controllers;
@@ -1073,6 +1067,9 @@ class Synth : public Midi::EventHandler, public SignalProducer
 
         Number midi_byte_to_float(Midi::Byte const midi_byte) const noexcept;
         Number midi_word_to_float(Midi::Word const midi_word) const noexcept;
+
+        void sustain_on(Seconds const time_offset) noexcept;
+        void sustain_off(Seconds const time_offset) noexcept;
 
         bool is_repeated_midi_controller_message(
             ControllerId const controller_id,
@@ -1118,6 +1115,8 @@ class Synth : public Midi::EventHandler, public SignalProducer
 
         void update_param_states() noexcept;
 
+        void garbage_collect_voices() noexcept;
+
         std::string const to_string(Integer const) const noexcept;
 
         std::vector<DelayedNoteOff> delayed_note_offs;
@@ -1137,6 +1136,8 @@ class Synth : public Midi::EventHandler, public SignalProducer
         Integer midi_note_to_voice_assignments[Midi::CHANNELS][Midi::NOTES];
         Modulator* modulators[POLYPHONY];
         Carrier* carriers[POLYPHONY];
+        Integer samples_since_gc;
+        Integer samples_between_gc;
         Integer next_voice;
         Midi::Note previous_note;
         bool is_learning;

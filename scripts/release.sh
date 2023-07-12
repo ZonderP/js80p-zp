@@ -9,6 +9,7 @@ TARGET_PLATFORMS="x86_64-w64-mingw32 i686-w64-mingw32 x86_64-gpp i686-gpp"
 PLUGIN_TYPES="fst vst3"
 TEXT_FILES="LICENSE.txt README.txt NEWS.txt"
 DIST_DIR_BASE="dist"
+README_HTML="$DIST_DIR_BASE/README.html"
 
 main()
 {
@@ -60,6 +61,7 @@ main()
     log "Cleaning up"
 
     cleanup "$DIST_DIR_BASE"
+    cleanup "$README_HTML"
 
     log "Copying source"
 
@@ -86,6 +88,10 @@ main()
         "$DIST_DIR_BASE/$source_dir/"
 
     find "$DIST_DIR_BASE/$source_dir/" -name ".*.swp" -delete
+
+    log "Generating $README_HTML"
+
+    build_readme_html >"$README_HTML"
 
     log "Creating source archive"
 
@@ -144,6 +150,16 @@ cleanup()
         log "Removing $name"
         rm -rf -- "$name"
     fi
+}
+
+build_readme_html()
+{
+    local placeholder="^{{HTML}}$"
+    local template="scripts/readme_html.tpl"
+
+    grep -B 10000000 "$placeholder" "$template" | grep -v "$placeholder"
+    cat README.md | grep -v "<img.*src.*raw.githubusercontent.com" | markdown
+    grep -A 10000000 "$placeholder" "$template" | grep -v "$placeholder"
 }
 
 version_str_to_int()
@@ -215,6 +231,7 @@ finalize_package()
 
     log "Copying presets, etc. to $DIST_DIR_BASE/$dist_dir"
 
+    cp --verbose "$README_HTML" "$DIST_DIR_BASE/$dist_dir/"
     cp --verbose --recursive presets "$DIST_DIR_BASE/$dist_dir/"
 
     if [[ "$convert_newlines" = "convert" ]]
@@ -278,6 +295,9 @@ package_vst3_bundle()
 
     cp --verbose "js80p.png" "$vst3_base_dir/js80p.vst3/Resources/Snapshots/${proc_id}_snapshot.png"
 
+    cp --verbose "$README_HTML" "$doc_dir/README.html"
+
+    copy_vst3 "$version_as_file_name" "linux-32bit" "$vst3_base_dir" "i386-linux" "js80p.so"
     copy_vst3 "$version_as_file_name" "linux-32bit" "$vst3_base_dir" "i686-linux" "js80p.so"
     copy_vst3 "$version_as_file_name" "linux-64bit" "$vst3_base_dir" "x86_64-linux" "js80p.so"
     copy_vst3 "$version_as_file_name" "windows-32bit" "$vst3_base_dir" "x86-win" "js80p.vst3"

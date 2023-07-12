@@ -71,7 +71,7 @@ Synth::ModeParam::ModeParam(std::string const name) noexcept
 }
 
 
-Synth::Synth() noexcept
+Synth::Synth(Integer const samples_between_gc) noexcept
     : SignalProducer(
         OUT_CHANNELS,
         6                           // MODE + MIX + PM + FM + AM + bus
@@ -103,6 +103,8 @@ Synth::Synth() noexcept
         modulator_add_volume
     ),
     effects("E", bus),
+    samples_since_gc(0),
+    samples_between_gc(samples_between_gc),
     next_voice(0),
     previous_note(Midi::NOTE_MAX + 1),
     is_learning(false),
@@ -112,7 +114,7 @@ Synth::Synth() noexcept
     envelopes((Envelope* const*)envelopes_rw),
     lfos((LFO* const*)lfos_rw)
 {
-    delayed_note_offs.reserve(POLYPHONY);
+    delayed_note_offs.reserve(2 * POLYPHONY);
 
     initialize_supported_midi_controllers();
 
@@ -598,6 +600,14 @@ Synth::~Synth()
 }
 
 
+void Synth::set_sample_rate(Frequency const new_sample_rate) noexcept
+{
+    SignalProducer::set_sample_rate(new_sample_rate);
+
+    samples_between_gc = std::max((Integer)5000, (Integer)(new_sample_rate * 0.2));
+}
+
+
 bool Synth::is_lock_free() const noexcept
 {
     bool is_lock_free = true;
@@ -690,13 +700,13 @@ void Synth::note_on(
         Mode const mode = this->mode.get_value();
 
         if (mode == MIX_AND_MOD) {
-            modulators[next_voice]->note_on(time_offset, note, velocity_float, previous_note);
-            carriers[next_voice]->note_on(time_offset, note, velocity_float, previous_note);
+            modulators[next_voice]->note_on(time_offset, note, channel, velocity_float, previous_note);
+            carriers[next_voice]->note_on(time_offset, note, channel, velocity_float, previous_note);
         } else {
             if (note < mode + Midi::NOTE_B_2) {
-                modulators[next_voice]->note_on(time_offset, note, velocity_float, previous_note);
+                modulators[next_voice]->note_on(time_offset, note, channel, velocity_float, previous_note);
             } else {
-                carriers[next_voice]->note_on(time_offset, note, velocity_float, previous_note);
+                carriers[next_voice]->note_on(time_offset, note, channel, velocity_float, previous_note);
             }
         }
 
@@ -759,8 +769,9 @@ bool Synth::is_repeated_midi_controller_message(
         Midi::Word const value
 ) noexcept {
     /*
-    By default, FL Studio sends pitch bends separately on all channels, but it's
-    enough for JS80P to handle only one of those.
+    By default, FL Studio 21 sends multiple clones of the same pitch bend event
+    separately on all channels, but it's enough for JS80P to handle only one of
+    those.
     */
     MidiControllerMessage const message(time_offset, value);
 
@@ -830,34 +841,53 @@ void Synth::control_change(
     }
 
     midi_controllers_rw[controller]->change(time_offset, midi_byte_to_float(new_value));
+
+    if (controller == Midi::SUSTAIN_PEDAL) {
+        if (new_value < 64) {
+            sustain_off(time_offset);
+        } else {
+            sustain_on(time_offset);
+        }
+    }
 }
 
 
-void Synth::sustain_on(
-        Seconds const time_offset,
-        Midi::Channel const channel
-) noexcept {
+void Synth::sustain_on(Seconds const time_offset) noexcept
+{
     is_sustaining = true;
 }
 
 
-void Synth::sustain_off(
-        Seconds const time_offset,
-        Midi::Channel const channel
-) noexcept {
+void Synth::sustain_off(Seconds const time_offset) noexcept
+{
     is_sustaining = false;
 
     for (std::vector<DelayedNoteOff>::const_iterator it = delayed_note_offs.begin(); it != delayed_note_offs.end(); ++it) {
         DelayedNoteOff const& delayed_note_off = *it;
         Integer const voice = delayed_note_off.get_voice();
 
-        if (voice != INVALID_VOICE) {
-            Midi::Note const note = delayed_note_off.get_note();
-            Number const velocity = midi_byte_to_float(delayed_note_off.get_velocity());
-
-            modulators[voice]->note_off(time_offset, note, velocity);
-            carriers[voice]->note_off(time_offset, note, velocity);
+        if (UNLIKELY(voice == INVALID_VOICE)) {
+            /* This should never happen, but safety first! */
+            continue;
         }
+
+        Midi::Channel const channel = delayed_note_off.get_channel();
+        Midi::Note const note = delayed_note_off.get_note();
+
+        if (midi_note_to_voice_assignments[channel][note] != INVALID_VOICE) {
+            /*
+            The voice might have decayed and got garbage collected after the
+            note-off event, and then it might have been assigned to play a new
+            note for which the key is still being held down. If that's the
+            case, then the voice shold keep ringing.
+            */
+            continue;
+        }
+
+        Number const velocity = midi_byte_to_float(delayed_note_off.get_velocity());
+
+        modulators[voice]->note_off(time_offset, note, velocity);
+        carriers[voice]->note_off(time_offset, note, velocity);
     }
 
     delayed_note_offs.clear();
@@ -1213,6 +1243,13 @@ Sample const* const* Synth::initialize_rendering(
 ) noexcept {
     process_messages();
 
+    samples_since_gc += sample_count;
+
+    if (samples_since_gc > samples_between_gc) {
+        garbage_collect_voices();
+        samples_since_gc = 0;
+    }
+
     raw_output = SignalProducer::produce< Effects::Effects<Bus> >(
         effects, round, sample_count
     );
@@ -1232,6 +1269,48 @@ Sample const* const* Synth::initialize_rendering(
     clear_midi_controllers();
 
     return NULL;
+}
+
+
+void Synth::garbage_collect_voices() noexcept
+{
+    for (Integer voice = 0; voice != POLYPHONY; ++voice) {
+        Midi::Channel channel;
+        Midi::Note note;
+
+        Modulator* const modulator = modulators[voice];
+        bool const modulator_decayed = modulator->has_decayed_during_envelope_dahds();
+
+        if (modulator_decayed) {
+            note = modulator->get_note();
+            channel = modulator->get_channel();
+            modulator->cancel_note();
+        }
+
+        Carrier* const carrier = carriers[voice];
+        bool const carrier_decayed = carrier->has_decayed_during_envelope_dahds();
+
+        if (carrier_decayed) {
+            note = carrier->get_note();
+            channel = carrier->get_channel();
+            carrier->cancel_note();
+        }
+
+        if (modulator_decayed && carrier_decayed) {
+            Integer const assigned = midi_note_to_voice_assignments[channel][note];
+
+            /*
+            The note's key might have been released and triggered again while
+            the sustain pedal was engaged. If that's the case, then it is
+            assigned to a different voice which was free at the time. If so, we
+            don't want to de-assign that other voice.
+            */
+
+            if (voice == assigned) {
+                midi_note_to_voice_assignments[channel][note] = INVALID_VOICE;
+            }
+        }
+    }
 }
 
 
