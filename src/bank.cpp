@@ -150,50 +150,6 @@ Bank::Program::Program()
 }
 
 
-Bank::Program::Program(Program const& program)
-    : name(program.name),
-    default_name(program.default_name),
-    serialized(program.serialized),
-    params_start(program.params_start)
-{
-}
-
-
-Bank::Program::Program(Program const&& program)
-    : name(program.name),
-    default_name(program.default_name),
-    serialized(program.serialized),
-    params_start(program.params_start)
-{
-}
-
-
-Bank::Program& Bank::Program::operator=(Program const& program)
-{
-    if (this != &program) {
-        name = program.name;
-        serialized = program.serialized;
-        default_name = program.default_name;
-        params_start = program.params_start;
-    }
-
-    return *this;
-}
-
-
-Bank::Program& Bank::Program::operator=(Program const&& program)
-{
-    if (this != &program) {
-        name = program.name;
-        serialized = program.serialized;
-        default_name = program.default_name;
-        params_start = program.params_start;
-    }
-
-    return *this;
-}
-
-
 std::string const& Bank::Program::get_name() const
 {
     return name;
@@ -328,23 +284,21 @@ Number Bank::program_index_to_normalized_parameter_value(size_t const index)
 
 Bank::Bank() : current_program_index(0)
 {
-    reset();
-}
-
-
-void Bank::reset()
-{
     size_t i = 0;
-
-    current_program_index = 0;
 
     for (; i != NUMBER_OF_BUILT_IN_PROGRAMS; ++i) {
         programs[i] = BUILT_IN_PROGRAMS[i];
     }
 
+    generate_empty_programs(i);
+}
+
+
+void Bank::generate_empty_programs(size_t const start_index)
+{
     char default_name[Program::NAME_MAX_LENGTH];
 
-    for (; i != NUMBER_OF_PROGRAMS; ++i) {
+    for (size_t i = start_index; i != NUMBER_OF_PROGRAMS; ++i) {
         snprintf(
             default_name,
             Program::NAME_MAX_LENGTH,
@@ -399,11 +353,34 @@ void Bank::import(std::string const& serialized_bank)
     Serializer::Lines::const_iterator end = lines->end();
     size_t next_program_index = 0;
 
-    reset();
-
     while (it != end && next_program_index < NUMBER_OF_PROGRAMS) {
         programs[next_program_index++].import(it, end);
     }
+
+    generate_empty_programs(next_program_index);
+
+    delete lines;
+}
+
+
+void Bank::import_names(std::string const& serialized_bank)
+{
+    Serializer::Lines* lines = Serializer::parse_lines(serialized_bank);
+    Serializer::Lines::const_iterator it = lines->begin();
+    Serializer::Lines::const_iterator end = lines->end();
+    size_t next_program_index = 0;
+    Program dummy_program;
+
+    while (it != end && next_program_index < NUMBER_OF_PROGRAMS) {
+        dummy_program.import(it, end);
+
+        programs[next_program_index].import("");
+        programs[next_program_index].set_name(dummy_program.get_name());
+
+        ++next_program_index;
+    }
+
+    generate_empty_programs(next_program_index);
 
     delete lines;
 }

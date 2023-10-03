@@ -18,6 +18,7 @@
 
 #include <cmath>
 #include <string>
+#include <utility>
 
 #include "test.cpp"
 #include "utils.cpp"
@@ -71,6 +72,31 @@ TEST(only_latin_printable_characters_are_allowed_in_program_names, {
 
     program.set_name("[long name with disallowed characters]");
     assert_eq("long name with disal..s", program.get_name());
+})
+
+
+TEST(program_copy_and_move, {
+    Bank::Program orig("Some Program Name", "Default Name", "");
+    Bank::Program ctor_copy(orig);
+    Bank::Program op_copy("Other Program Name", "Other Default Name", "");
+    Bank::Program op_move("Other Program Name", "Other Default Name", "");
+
+    op_copy = orig;
+
+    assert_eq("Some Program Name", ctor_copy.get_name());
+    assert_eq("Some..e", ctor_copy.get_short_name());
+
+    assert_eq("Some Program Name", op_copy.get_name());
+    assert_eq("Some..e", op_copy.get_short_name());
+
+    Bank::Program ctor_move(std::move(ctor_copy));
+    op_move = std::move(op_copy);
+
+    assert_eq("Some Program Name", ctor_move.get_name());
+    assert_eq("Some..e", ctor_move.get_short_name());
+
+    assert_eq("Some Program Name", op_move.get_name());
+    assert_eq("Some..e", op_move.get_short_name());
 })
 
 
@@ -311,7 +337,7 @@ TEST(serialization, {
     assert_true(bank[4].is_blank());
     assert_neq("to be reset name", bank[5].get_name().c_str());
 
-    assert_eq(0, (int)bank.get_current_program_index());
+    assert_eq(42, (int)bank.get_current_program_index());
 
     for (size_t i = 3; i != Bank::NUMBER_OF_PROGRAMS; ++i) {
         bank[i].import("");
@@ -366,5 +392,65 @@ TEST(can_convert_normalized_parameter_value_to_program_index, {
             Bank::NUMBER_OF_PROGRAMS + 1
         ),
         DOUBLE_DELTA
+    );
+})
+
+
+TEST(bank_can_import_program_names_without_patches, {
+    std::string const serialized_bank = (
+        "[someblock]\n"
+        "MIX = 0.5\n"
+        "NAME = not a JS80P patch\n"
+        "\n"
+        "[js80p]\n"
+        "NAME = preset 1\n"
+        "MIX = 1.0\n"
+        "\n"
+        "[x]\n"
+        "MIX = 1.5\n"
+        "NAME = still not a JS80P patch\n"
+        "\n"
+        "  [js80p]\n"
+        "; default name\n"
+        "NAME =\n"
+        "MIX = 2.0\n"
+        "[js80p]\n"
+        "; a comment containing the [js80p] section header\n"
+        "NAME = preset 3\n"
+        "MIX = 3.0\n"
+    );
+    std::string const expeced_serialized = (
+        "[js80p]\r\n"
+        "NAME = preset 1\r\n"
+        "\r\n"
+        "[js80p]\r\n"
+        "NAME = Prog002\r\n"
+        "\r\n"
+        "[js80p]\r\n"
+        "NAME = preset 3\r\n"
+        "\r\n"
+        "[js80p]\r\n"
+        "NAME = Prog004\r\n"
+        "\r\n"
+        "[js80p]\r\n"
+        "NAME = Prog005\r\n"
+        "\r\n"
+        "[js80p]\r\n"
+        "NAME = Prog006\r\n"
+    );
+    Bank bank;
+
+    bank.import_names(serialized_bank);
+
+    assert_eq("preset 1", bank[0].get_name());
+    assert_eq("Prog002", bank[1].get_name());
+    assert_eq("preset 3", bank[2].get_name());
+    assert_eq("Prog004", bank[3].get_name());
+    assert_eq("Prog005", bank[4].get_name());
+    assert_eq("Prog006", bank[5].get_name());
+
+    assert_eq(
+        expeced_serialized,
+        bank.serialize().substr(0, expeced_serialized.length()).c_str()
     );
 })

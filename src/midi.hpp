@@ -113,9 +113,11 @@ class Dispatcher
 
 constexpr Channel CHANNEL_MAX                       = 15;
 constexpr Channel CHANNELS                          = CHANNEL_MAX + 1;
+constexpr Channel INVALID_CHANNEL                   = 255;
 
 constexpr Note NOTE_MAX                             = 127;
 constexpr Note NOTES                                = NOTE_MAX + 1;
+constexpr Note INVALID_NOTE                         = 255;
 
 constexpr Note NOTE_G_9                             = 127;
 constexpr Note NOTE_F_SHARP_9                       = 126;
@@ -470,6 +472,8 @@ constexpr Controller UNDEFINED_36                   = 116;
 constexpr Controller UNDEFINED_37                   = 117;
 constexpr Controller UNDEFINED_38                   = 118;
 constexpr Controller UNDEFINED_39                   = 119;
+
+constexpr Controller MAX_CONTROLLER_ID              = 127;
 
 constexpr Command NOTE_OFF                          = 0x80;
 constexpr Command NOTE_ON                           = 0x90;

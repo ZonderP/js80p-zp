@@ -25,6 +25,9 @@
 
 #include "js80p.hpp"
 #include "midi.hpp"
+#include "note_stack.hpp"
+#include "spscqueue.hpp"
+#include "voice.hpp"
 
 #include "dsp/envelope.hpp"
 #include "dsp/biquad_filter.hpp"
@@ -34,19 +37,20 @@
 #include "dsp/echo.hpp"
 #include "dsp/effect.hpp"
 #include "dsp/effects.hpp"
-#include "dsp/flexible_controller.hpp"
 #include "dsp/filter.hpp"
 #include "dsp/gain.hpp"
 #include "dsp/lfo.hpp"
+#include "dsp/macro.hpp"
 #include "dsp/math.hpp"
 #include "dsp/midi_controller.hpp"
 #include "dsp/mixer.hpp"
 #include "dsp/oscillator.hpp"
 #include "dsp/param.hpp"
+#include "dsp/peak_tracker.hpp"
 #include "dsp/reverb.hpp"
 #include "dsp/queue.hpp"
+#include "dsp/side_chain_compressable_effect.hpp"
 #include "dsp/signal_producer.hpp"
-#include "dsp/voice.hpp"
 
 
 namespace JS80P
@@ -72,9 +76,15 @@ class Synth : public Midi::EventHandler, public SignalProducer
         static constexpr Integer OUT_CHANNELS = Carrier::CHANNELS;
 
         static constexpr Integer ENVELOPES = 6;
+        static constexpr Integer ENVELOPE_FLOAT_PARAMS = 10;
+
         static constexpr Integer MIDI_CONTROLLERS = 128;
-        static constexpr Integer FLEXIBLE_CONTROLLERS = 20;
+
+        static constexpr Integer MACROS = 20;
+        static constexpr Integer MACRO_FLOAT_PARAMS = 6;
+
         static constexpr Integer LFOS = 8;
+        static constexpr Integer LFO_FLOAT_PARAMS = 7;
 
         enum MessageType {
             SET_PARAM = 1,          ///< Set the given parameter's ratio to
@@ -161,377 +171,396 @@ class Synth : public Midi::EventHandler, public SignalProducer
             CF2Q = 54,       ///< Carrier Filter 2 Q Factor
             CF2G = 55,       ///< Carrier Filter 2 Gain
 
-            EOG = 56,        ///< Effects Overdrive Gain
+            EV1V = 56,       ///< Effects Volume 1
 
-            EDG = 57,        ///< Effects Distortion Gain
+            EOG = 57,        ///< Effects Overdrive Gain
 
-            EF1FRQ = 58,     ///< Effects Filter 1 Frequency
-            EF1Q = 59,       ///< Effects Filter 1 Q Factor
-            EF1G = 60,       ///< Effects Filter 1 Gain
+            EDG = 58,        ///< Effects Distortion Gain
 
-            EF2FRQ = 61,     ///< Effects Filter 2 Frequency
-            EF2Q = 62,       ///< Effects Filter 2 Q Factor
-            EF2G = 63,       ///< Effects Filter 2 Gain
+            EF1FRQ = 59,     ///< Effects Filter 1 Frequency
+            EF1Q = 60,       ///< Effects Filter 1 Q Factor
+            EF1G = 61,       ///< Effects Filter 1 Gain
 
-            ECDEL = 64,      ///< Effects Chorus Delay
-            ECFRQ = 65,      ///< Effects Chorus LFO Frequency
-            ECDPT = 66,      ///< Effects Chorus Depth
-            ECFB = 67,       ///< Effects Chorus Feedback
-            ECDF = 68,       ///< Effects Chorus Dampening Frequency
-            ECDG = 69,       ///< Effects Chorus Dampening Gain
-            ECWID = 70,      ///< Effects Chorus Stereo Width
-            ECHPF = 71,      ///< Effects Chorus Highpass Frequency
-            ECWET = 72,      ///< Effects Chorus Wet Volume
-            ECDRY = 73,      ///< Effects Chorus Dry Volume
+            EF2FRQ = 62,     ///< Effects Filter 2 Frequency
+            EF2Q = 63,       ///< Effects Filter 2 Q Factor
+            EF2G = 64,       ///< Effects Filter 2 Gain
 
-            EEDEL = 74,      ///< Effects Echo Delay
-            EEFB = 75,       ///< Effects Echo Feedback
-            EEDF = 76,       ///< Effects Echo Dampening Frequency
-            EEDG = 77,       ///< Effects Echo Dampening Gain
-            EEWID = 78,      ///< Effects Echo Stereo Width
-            EEHPF = 79,      ///< Effects Echo Highpass Frequency
-            EEWET = 80,      ///< Effects Echo Wet Volume
-            EEDRY = 81,      ///< Effects Echo Dry Volume
+            EV2V = 65,       ///< Effects Volume 2
 
-            ERRS = 82,       ///< Effects Reverb Room Size
-            ERDF = 83,       ///< Effects Reverb Dampening Frequency
-            ERDG = 84,       ///< Effects Reverb Dampening Gain
-            ERWID = 85,      ///< Effects Reverb Stereo Width
-            ERHPF = 86,      ///< Effects Reverb Highpass Frequency
-            ERWET = 87,      ///< Effects Reverb Wet Volume
-            ERDRY = 88,      ///< Effects Reverb Dry Volume
+            ECDEL = 66,      ///< Effects Chorus Delay
+            ECFRQ = 67,      ///< Effects Chorus LFO Frequency
+            ECDPT = 68,      ///< Effects Chorus Depth
+            ECFB = 69,       ///< Effects Chorus Feedback
+            ECDF = 70,       ///< Effects Chorus Dampening Frequency
+            ECDG = 71,       ///< Effects Chorus Dampening Gain
+            ECWID = 72,      ///< Effects Chorus Stereo Width
+            ECHPF = 73,      ///< Effects Chorus Highpass Frequency
+            ECWET = 74,      ///< Effects Chorus Wet Volume
+            ECDRY = 75,      ///< Effects Chorus Dry Volume
 
-            F1IN = 89,       ///< Flexible Controller 1 Input
-            F1MIN = 90,      ///< Flexible Controller 1 Minimum Value
-            F1MAX = 91,      ///< Flexible Controller 1 Maximum Value
-            F1AMT = 92,      ///< Flexible Controller 1 Amount
-            F1DST = 93,      ///< Flexible Controller 1 Distortion
-            F1RND = 94,      ///< Flexible Controller 1 Randomness
+            EEDEL = 76,      ///< Effects Echo Delay
+            EEFB = 77,       ///< Effects Echo Feedback
+            EEDF = 78,       ///< Effects Echo Dampening Frequency
+            EEDG = 79,       ///< Effects Echo Dampening Gain
+            EEWID = 80,      ///< Effects Echo Stereo Width
+            EEHPF = 81,      ///< Effects Echo Highpass Frequency
+            EECTH = 82,      ///< Effects Echo Side-Chain Compression Threshold
+            EECAT = 83,      ///< Effects Echo Side-Chain Compression Attack Time
+            EECRL = 84,      ///< Effects Echo Side-Chain Compression Release Time
+            EECR = 85,       ///< Effects Echo Side-Chain Compression Ratio
+            EEWET = 86,      ///< Effects Echo Wet Volume
+            EEDRY = 87,      ///< Effects Echo Dry Volume
 
-            F2IN = 95,       ///< Flexible Controller 2 Input
-            F2MIN = 96,      ///< Flexible Controller 2 Minimum Value
-            F2MAX = 97,      ///< Flexible Controller 2 Maximum Value
-            F2AMT = 98,      ///< Flexible Controller 2 Amount
-            F2DST = 99,      ///< Flexible Controller 2 Distortion
-            F2RND = 100,     ///< Flexible Controller 2 Randomness
+            ERRS = 88,       ///< Effects Reverb Room Size
+            ERDF = 89,       ///< Effects Reverb Dampening Frequency
+            ERDG = 90,       ///< Effects Reverb Dampening Gain
+            ERWID = 91,      ///< Effects Reverb Stereo Width
+            ERHPF = 92,      ///< Effects Reverb Highpass Frequency
+            ERCTH = 93,      ///< Effects Reverb Side-Chain Compression Threshold
+            ERCAT = 94,      ///< Effects Reverb Side-Chain Compression Attack Time
+            ERCRL = 95,      ///< Effects Reverb Side-Chain Compression Release Time
+            ERCR = 96,       ///< Effects Reverb Side-Chain Compression Ratio
+            ERWET = 97,      ///< Effects Reverb Wet Volume
+            ERDRY = 98,      ///< Effects Reverb Dry Volume
 
-            F3IN = 101,      ///< Flexible Controller 3 Input
-            F3MIN = 102,     ///< Flexible Controller 3 Minimum Value
-            F3MAX = 103,     ///< Flexible Controller 3 Maximum Value
-            F3AMT = 104,     ///< Flexible Controller 3 Amount
-            F3DST = 105,     ///< Flexible Controller 3 Distortion
-            F3RND = 106,     ///< Flexible Controller 3 Randomness
+            EV3V = 99,       ///< Effects Volume 3
 
-            F4IN = 107,      ///< Flexible Controller 4 Input
-            F4MIN = 108,     ///< Flexible Controller 4 Minimum Value
-            F4MAX = 109,     ///< Flexible Controller 4 Maximum Value
-            F4AMT = 110,     ///< Flexible Controller 4 Amount
-            F4DST = 111,     ///< Flexible Controller 4 Distortion
-            F4RND = 112,     ///< Flexible Controller 4 Randomness
+            M1IN = 100,      ///< Macro 1 Input
+            M1MIN = 101,     ///< Macro 1 Minimum Value
+            M1MAX = 102,     ///< Macro 1 Maximum Value
+            M1AMT = 103,     ///< Macro 1 Amount
+            M1DST = 104,     ///< Macro 1 Distortion
+            M1RND = 105,     ///< Macro 1 Randomness
 
-            F5IN = 113,      ///< Flexible Controller 5 Input
-            F5MIN = 114,     ///< Flexible Controller 5 Minimum Value
-            F5MAX = 115,     ///< Flexible Controller 5 Maximum Value
-            F5AMT = 116,     ///< Flexible Controller 5 Amount
-            F5DST = 117,     ///< Flexible Controller 5 Distortion
-            F5RND = 118,     ///< Flexible Controller 5 Randomness
+            M2IN = 106,      ///< Macro 2 Input
+            M2MIN = 107,     ///< Macro 2 Minimum Value
+            M2MAX = 108,     ///< Macro 2 Maximum Value
+            M2AMT = 109,     ///< Macro 2 Amount
+            M2DST = 110,     ///< Macro 2 Distortion
+            M2RND = 111,     ///< Macro 2 Randomness
 
-            F6IN = 119,      ///< Flexible Controller 6 Input
-            F6MIN = 120,     ///< Flexible Controller 6 Minimum Value
-            F6MAX = 121,     ///< Flexible Controller 6 Maximum Value
-            F6AMT = 122,     ///< Flexible Controller 6 Amount
-            F6DST = 123,     ///< Flexible Controller 6 Distortion
-            F6RND = 124,     ///< Flexible Controller 6 Randomness
+            M3IN = 112,      ///< Macro 3 Input
+            M3MIN = 113,     ///< Macro 3 Minimum Value
+            M3MAX = 114,     ///< Macro 3 Maximum Value
+            M3AMT = 115,     ///< Macro 3 Amount
+            M3DST = 116,     ///< Macro 3 Distortion
+            M3RND = 117,     ///< Macro 3 Randomness
 
-            F7IN = 125,      ///< Flexible Controller 7 Input
-            F7MIN = 126,     ///< Flexible Controller 7 Minimum Value
-            F7MAX = 127,     ///< Flexible Controller 7 Maximum Value
-            F7AMT = 128,     ///< Flexible Controller 7 Amount
-            F7DST = 129,     ///< Flexible Controller 7 Distortion
-            F7RND = 130,     ///< Flexible Controller 7 Randomness
+            M4IN = 118,      ///< Macro 4 Input
+            M4MIN = 119,     ///< Macro 4 Minimum Value
+            M4MAX = 120,     ///< Macro 4 Maximum Value
+            M4AMT = 121,     ///< Macro 4 Amount
+            M4DST = 122,     ///< Macro 4 Distortion
+            M4RND = 123,     ///< Macro 4 Randomness
 
-            F8IN = 131,      ///< Flexible Controller 8 Input
-            F8MIN = 132,     ///< Flexible Controller 8 Minimum Value
-            F8MAX = 133,     ///< Flexible Controller 8 Maximum Value
-            F8AMT = 134,     ///< Flexible Controller 8 Amount
-            F8DST = 135,     ///< Flexible Controller 8 Distortion
-            F8RND = 136,     ///< Flexible Controller 8 Randomness
+            M5IN = 124,      ///< Macro 5 Input
+            M5MIN = 125,     ///< Macro 5 Minimum Value
+            M5MAX = 126,     ///< Macro 5 Maximum Value
+            M5AMT = 127,     ///< Macro 5 Amount
+            M5DST = 128,     ///< Macro 5 Distortion
+            M5RND = 129,     ///< Macro 5 Randomness
 
-            F9IN = 137,      ///< Flexible Controller 9 Input
-            F9MIN = 138,     ///< Flexible Controller 9 Minimum Value
-            F9MAX = 139,     ///< Flexible Controller 9 Maximum Value
-            F9AMT = 140,     ///< Flexible Controller 9 Amount
-            F9DST = 141,     ///< Flexible Controller 9 Distortion
-            F9RND = 142,     ///< Flexible Controller 9 Randomness
+            M6IN = 130,      ///< Macro 6 Input
+            M6MIN = 131,     ///< Macro 6 Minimum Value
+            M6MAX = 132,     ///< Macro 6 Maximum Value
+            M6AMT = 133,     ///< Macro 6 Amount
+            M6DST = 134,     ///< Macro 6 Distortion
+            M6RND = 135,     ///< Macro 6 Randomness
 
-            F10IN = 143,     ///< Flexible Controller 10 Input
-            F10MIN = 144,    ///< Flexible Controller 10 Minimum Value
-            F10MAX = 145,    ///< Flexible Controller 10 Maximum Value
-            F10AMT = 146,    ///< Flexible Controller 10 Amount
-            F10DST = 147,    ///< Flexible Controller 10 Distortion
-            F10RND = 148,    ///< Flexible Controller 10 Randomness
+            M7IN = 136,      ///< Macro 7 Input
+            M7MIN = 137,     ///< Macro 7 Minimum Value
+            M7MAX = 138,     ///< Macro 7 Maximum Value
+            M7AMT = 139,     ///< Macro 7 Amount
+            M7DST = 140,     ///< Macro 7 Distortion
+            M7RND = 141,     ///< Macro 7 Randomness
 
-            F11IN = 149,     ///< Flexible Controller 11 Input
-            F11MIN = 150,    ///< Flexible Controller 11 Minimum Value
-            F11MAX = 151,    ///< Flexible Controller 11 Maximum Value
-            F11AMT = 152,    ///< Flexible Controller 11 Amount
-            F11DST = 153,    ///< Flexible Controller 11 Distortion
-            F11RND = 154,    ///< Flexible Controller 11 Randomness
+            M8IN = 142,      ///< Macro 8 Input
+            M8MIN = 143,     ///< Macro 8 Minimum Value
+            M8MAX = 144,     ///< Macro 8 Maximum Value
+            M8AMT = 145,     ///< Macro 8 Amount
+            M8DST = 146,     ///< Macro 8 Distortion
+            M8RND = 147,     ///< Macro 8 Randomness
 
-            F12IN = 155,     ///< Flexible Controller 12 Input
-            F12MIN = 156,    ///< Flexible Controller 12 Minimum Value
-            F12MAX = 157,    ///< Flexible Controller 12 Maximum Value
-            F12AMT = 158,    ///< Flexible Controller 12 Amount
-            F12DST = 159,    ///< Flexible Controller 12 Distortion
-            F12RND = 160,    ///< Flexible Controller 12 Randomness
+            M9IN = 148,      ///< Macro 9 Input
+            M9MIN = 149,     ///< Macro 9 Minimum Value
+            M9MAX = 150,     ///< Macro 9 Maximum Value
+            M9AMT = 151,     ///< Macro 9 Amount
+            M9DST = 152,     ///< Macro 9 Distortion
+            M9RND = 153,     ///< Macro 9 Randomness
 
-            F13IN = 161,     ///< Flexible Controller 13 Input
-            F13MIN = 162,    ///< Flexible Controller 13 Minimum Value
-            F13MAX = 163,    ///< Flexible Controller 13 Maximum Value
-            F13AMT = 164,    ///< Flexible Controller 13 Amount
-            F13DST = 165,    ///< Flexible Controller 13 Distortion
-            F13RND = 166,    ///< Flexible Controller 13 Randomness
+            M10IN = 154,     ///< Macro 10 Input
+            M10MIN = 155,    ///< Macro 10 Minimum Value
+            M10MAX = 156,    ///< Macro 10 Maximum Value
+            M10AMT = 157,    ///< Macro 10 Amount
+            M10DST = 158,    ///< Macro 10 Distortion
+            M10RND = 159,    ///< Macro 10 Randomness
 
-            F14IN = 167,     ///< Flexible Controller 14 Input
-            F14MIN = 168,    ///< Flexible Controller 14 Minimum Value
-            F14MAX = 169,    ///< Flexible Controller 14 Maximum Value
-            F14AMT = 170,    ///< Flexible Controller 14 Amount
-            F14DST = 171,    ///< Flexible Controller 14 Distortion
-            F14RND = 172,    ///< Flexible Controller 14 Randomness
+            M11IN = 160,     ///< Macro 11 Input
+            M11MIN = 161,    ///< Macro 11 Minimum Value
+            M11MAX = 162,    ///< Macro 11 Maximum Value
+            M11AMT = 163,    ///< Macro 11 Amount
+            M11DST = 164,    ///< Macro 11 Distortion
+            M11RND = 165,    ///< Macro 11 Randomness
 
-            F15IN = 173,     ///< Flexible Controller 15 Input
-            F15MIN = 174,    ///< Flexible Controller 15 Minimum Value
-            F15MAX = 175,    ///< Flexible Controller 15 Maximum Value
-            F15AMT = 176,    ///< Flexible Controller 15 Amount
-            F15DST = 177,    ///< Flexible Controller 15 Distortion
-            F15RND = 178,    ///< Flexible Controller 15 Randomness
+            M12IN = 166,     ///< Macro 12 Input
+            M12MIN = 167,    ///< Macro 12 Minimum Value
+            M12MAX = 168,    ///< Macro 12 Maximum Value
+            M12AMT = 169,    ///< Macro 12 Amount
+            M12DST = 170,    ///< Macro 12 Distortion
+            M12RND = 171,    ///< Macro 12 Randomness
 
-            F16IN = 179,     ///< Flexible Controller 16 Input
-            F16MIN = 180,    ///< Flexible Controller 16 Minimum Value
-            F16MAX = 181,    ///< Flexible Controller 16 Maximum Value
-            F16AMT = 182,    ///< Flexible Controller 16 Amount
-            F16DST = 183,    ///< Flexible Controller 16 Distortion
-            F16RND = 184,    ///< Flexible Controller 16 Randomness
+            M13IN = 172,     ///< Macro 13 Input
+            M13MIN = 173,    ///< Macro 13 Minimum Value
+            M13MAX = 174,    ///< Macro 13 Maximum Value
+            M13AMT = 175,    ///< Macro 13 Amount
+            M13DST = 176,    ///< Macro 13 Distortion
+            M13RND = 177,    ///< Macro 13 Randomness
 
-            F17IN = 185,     ///< Flexible Controller 17 Input
-            F17MIN = 186,    ///< Flexible Controller 17 Minimum Value
-            F17MAX = 187,    ///< Flexible Controller 17 Maximum Value
-            F17AMT = 188,    ///< Flexible Controller 17 Amount
-            F17DST = 189,    ///< Flexible Controller 17 Distortion
-            F17RND = 190,    ///< Flexible Controller 17 Randomness
+            M14IN = 178,     ///< Macro 14 Input
+            M14MIN = 179,    ///< Macro 14 Minimum Value
+            M14MAX = 180,    ///< Macro 14 Maximum Value
+            M14AMT = 181,    ///< Macro 14 Amount
+            M14DST = 182,    ///< Macro 14 Distortion
+            M14RND = 183,    ///< Macro 14 Randomness
 
-            F18IN = 191,     ///< Flexible Controller 18 Input
-            F18MIN = 192,    ///< Flexible Controller 18 Minimum Value
-            F18MAX = 193,    ///< Flexible Controller 18 Maximum Value
-            F18AMT = 194,    ///< Flexible Controller 18 Amount
-            F18DST = 195,    ///< Flexible Controller 18 Distortion
-            F18RND = 196,    ///< Flexible Controller 18 Randomness
+            M15IN = 184,     ///< Macro 15 Input
+            M15MIN = 185,    ///< Macro 15 Minimum Value
+            M15MAX = 186,    ///< Macro 15 Maximum Value
+            M15AMT = 187,    ///< Macro 15 Amount
+            M15DST = 188,    ///< Macro 15 Distortion
+            M15RND = 189,    ///< Macro 15 Randomness
 
-            F19IN = 197,     ///< Flexible Controller 19 Input
-            F19MIN = 198,    ///< Flexible Controller 19 Minimum Value
-            F19MAX = 199,    ///< Flexible Controller 19 Maximum Value
-            F19AMT = 200,    ///< Flexible Controller 19 Amount
-            F19DST = 201,    ///< Flexible Controller 19 Distortion
-            F19RND = 202,    ///< Flexible Controller 19 Randomness
+            M16IN = 190,     ///< Macro 16 Input
+            M16MIN = 191,    ///< Macro 16 Minimum Value
+            M16MAX = 192,    ///< Macro 16 Maximum Value
+            M16AMT = 193,    ///< Macro 16 Amount
+            M16DST = 194,    ///< Macro 16 Distortion
+            M16RND = 195,    ///< Macro 16 Randomness
 
-            F20IN = 203,     ///< Flexible Controller 20 Input
-            F20MIN = 204,    ///< Flexible Controller 20 Minimum Value
-            F20MAX = 205,    ///< Flexible Controller 20 Maximum Value
-            F20AMT = 206,    ///< Flexible Controller 20 Amount
-            F20DST = 207,    ///< Flexible Controller 20 Distortion
-            F20RND = 208,    ///< Flexible Controller 20 Randomness
+            M17IN = 196,     ///< Macro 17 Input
+            M17MIN = 197,    ///< Macro 17 Minimum Value
+            M17MAX = 198,    ///< Macro 17 Maximum Value
+            M17AMT = 199,    ///< Macro 17 Amount
+            M17DST = 200,    ///< Macro 17 Distortion
+            M17RND = 201,    ///< Macro 17 Randomness
 
-            N1AMT = 209,     ///< Envelope 1 Amount
-            N1INI = 210,     ///< Envelope 1 Initial Level
-            N1DEL = 211,     ///< Envelope 1 Delay Time
-            N1ATK = 212,     ///< Envelope 1 Attack Time
-            N1PK = 213,      ///< Envelope 1 Peak Level
-            N1HLD = 214,     ///< Envelope 1 Hold Time
-            N1DEC = 215,     ///< Envelope 1 Decay Time
-            N1SUS = 216,     ///< Envelope 1 Sustain Level
-            N1REL = 217,     ///< Envelope 1 Release Time
-            N1FIN = 218,     ///< Envelope 1 Final Level
+            M18IN = 202,     ///< Macro 18 Input
+            M18MIN = 203,    ///< Macro 18 Minimum Value
+            M18MAX = 204,    ///< Macro 18 Maximum Value
+            M18AMT = 205,    ///< Macro 18 Amount
+            M18DST = 206,    ///< Macro 18 Distortion
+            M18RND = 207,    ///< Macro 18 Randomness
 
-            N2AMT = 219,     ///< Envelope 2 Amount
-            N2INI = 220,     ///< Envelope 2 Initial Level
-            N2DEL = 221,     ///< Envelope 2 Delay Time
-            N2ATK = 222,     ///< Envelope 2 Attack Time
-            N2PK = 223,      ///< Envelope 2 Peak Level
-            N2HLD = 224,     ///< Envelope 2 Hold Time
-            N2DEC = 225,     ///< Envelope 2 Decay Time
-            N2SUS = 226,     ///< Envelope 2 Sustain Level
-            N2REL = 227,     ///< Envelope 2 Release Time
-            N2FIN = 228,     ///< Envelope 2 Final Level
+            M19IN = 208,     ///< Macro 19 Input
+            M19MIN = 209,    ///< Macro 19 Minimum Value
+            M19MAX = 210,    ///< Macro 19 Maximum Value
+            M19AMT = 211,    ///< Macro 19 Amount
+            M19DST = 212,    ///< Macro 19 Distortion
+            M19RND = 213,    ///< Macro 19 Randomness
 
-            N3AMT = 229,     ///< Envelope 3 Amount
-            N3INI = 230,     ///< Envelope 3 Initial Level
-            N3DEL = 231,     ///< Envelope 3 Delay Time
-            N3ATK = 232,     ///< Envelope 3 Attack Time
-            N3PK = 233,      ///< Envelope 3 Peak Level
-            N3HLD = 234,     ///< Envelope 3 Hold Time
-            N3DEC = 235,     ///< Envelope 3 Decay Time
-            N3SUS = 236,     ///< Envelope 3 Sustain Level
-            N3REL = 237,     ///< Envelope 3 Release Time
-            N3FIN = 238,     ///< Envelope 3 Final Level
+            M20IN = 214,     ///< Macro 20 Input
+            M20MIN = 215,    ///< Macro 20 Minimum Value
+            M20MAX = 216,    ///< Macro 20 Maximum Value
+            M20AMT = 217,    ///< Macro 20 Amount
+            M20DST = 218,    ///< Macro 20 Distortion
+            M20RND = 219,    ///< Macro 20 Randomness
 
-            N4AMT = 239,     ///< Envelope 4 Amount
-            N4INI = 240,     ///< Envelope 4 Initial Level
-            N4DEL = 241,     ///< Envelope 4 Delay Time
-            N4ATK = 242,     ///< Envelope 4 Attack Time
-            N4PK = 243,      ///< Envelope 4 Peak Level
-            N4HLD = 244,     ///< Envelope 4 Hold Time
-            N4DEC = 245,     ///< Envelope 4 Decay Time
-            N4SUS = 246,     ///< Envelope 4 Sustain Level
-            N4REL = 247,     ///< Envelope 4 Release Time
-            N4FIN = 248,     ///< Envelope 4 Final Level
+            N1AMT = 220,     ///< Envelope 1 Amount
+            N1INI = 221,     ///< Envelope 1 Initial Level
+            N1DEL = 222,     ///< Envelope 1 Delay Time
+            N1ATK = 223,     ///< Envelope 1 Attack Time
+            N1PK = 224,      ///< Envelope 1 Peak Level
+            N1HLD = 225,     ///< Envelope 1 Hold Time
+            N1DEC = 226,     ///< Envelope 1 Decay Time
+            N1SUS = 227,     ///< Envelope 1 Sustain Level
+            N1REL = 228,     ///< Envelope 1 Release Time
+            N1FIN = 229,     ///< Envelope 1 Final Level
 
-            N5AMT = 249,     ///< Envelope 5 Amount
-            N5INI = 250,     ///< Envelope 5 Initial Level
-            N5DEL = 251,     ///< Envelope 5 Delay Time
-            N5ATK = 252,     ///< Envelope 5 Attack Time
-            N5PK = 253,      ///< Envelope 5 Peak Level
-            N5HLD = 254,     ///< Envelope 5 Hold Time
-            N5DEC = 255,     ///< Envelope 5 Decay Time
-            N5SUS = 256,     ///< Envelope 5 Sustain Level
-            N5REL = 257,     ///< Envelope 5 Release Time
-            N5FIN = 258,     ///< Envelope 5 Final Level
+            N2AMT = 230,     ///< Envelope 2 Amount
+            N2INI = 231,     ///< Envelope 2 Initial Level
+            N2DEL = 232,     ///< Envelope 2 Delay Time
+            N2ATK = 233,     ///< Envelope 2 Attack Time
+            N2PK = 234,      ///< Envelope 2 Peak Level
+            N2HLD = 235,     ///< Envelope 2 Hold Time
+            N2DEC = 236,     ///< Envelope 2 Decay Time
+            N2SUS = 237,     ///< Envelope 2 Sustain Level
+            N2REL = 238,     ///< Envelope 2 Release Time
+            N2FIN = 239,     ///< Envelope 2 Final Level
 
-            N6AMT = 259,     ///< Envelope 6 Amount
-            N6INI = 260,     ///< Envelope 6 Initial Level
-            N6DEL = 261,     ///< Envelope 6 Delay Time
-            N6ATK = 262,     ///< Envelope 6 Attack Time
-            N6PK = 263,      ///< Envelope 6 Peak Level
-            N6HLD = 264,     ///< Envelope 6 Hold Time
-            N6DEC = 265,     ///< Envelope 6 Decay Time
-            N6SUS = 266,     ///< Envelope 6 Sustain Level
-            N6REL = 267,     ///< Envelope 6 Release Time
-            N6FIN = 268,     ///< Envelope 6 Final Level
+            N3AMT = 240,     ///< Envelope 3 Amount
+            N3INI = 241,     ///< Envelope 3 Initial Level
+            N3DEL = 242,     ///< Envelope 3 Delay Time
+            N3ATK = 243,     ///< Envelope 3 Attack Time
+            N3PK = 244,      ///< Envelope 3 Peak Level
+            N3HLD = 245,     ///< Envelope 3 Hold Time
+            N3DEC = 246,     ///< Envelope 3 Decay Time
+            N3SUS = 247,     ///< Envelope 3 Sustain Level
+            N3REL = 248,     ///< Envelope 3 Release Time
+            N3FIN = 249,     ///< Envelope 3 Final Level
 
-            L1FRQ = 269,     ///< LFO 1 Frequency
-            L1PHS = 270,     ///< LFO 1 Phase
-            L1MIN = 271,     ///< LFO 1 Minimum Value
-            L1MAX = 272,     ///< LFO 1 Maximum Value
-            L1AMT = 273,     ///< LFO 1 Amount
-            L1DST = 274,     ///< LFO 1 Distortion
-            L1RND = 275,     ///< LFO 1 Randomness
+            N4AMT = 250,     ///< Envelope 4 Amount
+            N4INI = 251,     ///< Envelope 4 Initial Level
+            N4DEL = 252,     ///< Envelope 4 Delay Time
+            N4ATK = 253,     ///< Envelope 4 Attack Time
+            N4PK = 254,      ///< Envelope 4 Peak Level
+            N4HLD = 255,     ///< Envelope 4 Hold Time
+            N4DEC = 256,     ///< Envelope 4 Decay Time
+            N4SUS = 257,     ///< Envelope 4 Sustain Level
+            N4REL = 258,     ///< Envelope 4 Release Time
+            N4FIN = 259,     ///< Envelope 4 Final Level
 
-            L2FRQ = 276,     ///< LFO 2 Frequency
-            L2PHS = 277,     ///< LFO 2 Phase
-            L2MIN = 278,     ///< LFO 2 Minimum Value
-            L2MAX = 279,     ///< LFO 2 Maximum Value
-            L2AMT = 280,     ///< LFO 2 Amount
-            L2DST = 281,     ///< LFO 2 Distortion
-            L2RND = 282,     ///< LFO 2 Randomness
+            N5AMT = 260,     ///< Envelope 5 Amount
+            N5INI = 261,     ///< Envelope 5 Initial Level
+            N5DEL = 262,     ///< Envelope 5 Delay Time
+            N5ATK = 263,     ///< Envelope 5 Attack Time
+            N5PK = 264,      ///< Envelope 5 Peak Level
+            N5HLD = 265,     ///< Envelope 5 Hold Time
+            N5DEC = 266,     ///< Envelope 5 Decay Time
+            N5SUS = 267,     ///< Envelope 5 Sustain Level
+            N5REL = 268,     ///< Envelope 5 Release Time
+            N5FIN = 269,     ///< Envelope 5 Final Level
 
-            L3FRQ = 283,     ///< LFO 3 Frequency
-            L3PHS = 284,     ///< LFO 3 Phase
-            L3MIN = 285,     ///< LFO 3 Minimum Value
-            L3MAX = 286,     ///< LFO 3 Maximum Value
-            L3AMT = 287,     ///< LFO 3 Amount
-            L3DST = 288,     ///< LFO 3 Distortion
-            L3RND = 289,     ///< LFO 3 Randomness
+            N6AMT = 270,     ///< Envelope 6 Amount
+            N6INI = 271,     ///< Envelope 6 Initial Level
+            N6DEL = 272,     ///< Envelope 6 Delay Time
+            N6ATK = 273,     ///< Envelope 6 Attack Time
+            N6PK = 274,      ///< Envelope 6 Peak Level
+            N6HLD = 275,     ///< Envelope 6 Hold Time
+            N6DEC = 276,     ///< Envelope 6 Decay Time
+            N6SUS = 277,     ///< Envelope 6 Sustain Level
+            N6REL = 278,     ///< Envelope 6 Release Time
+            N6FIN = 279,     ///< Envelope 6 Final Level
 
-            L4FRQ = 290,     ///< LFO 4 Frequency
-            L4PHS = 291,     ///< LFO 4 Phase
-            L4MIN = 292,     ///< LFO 4 Minimum Value
-            L4MAX = 293,     ///< LFO 4 Maximum Value
-            L4AMT = 294,     ///< LFO 4 Amount
-            L4DST = 295,     ///< LFO 4 Distortion
-            L4RND = 296,     ///< LFO 4 Randomness
+            L1FRQ = 280,     ///< LFO 1 Frequency
+            L1PHS = 281,     ///< LFO 1 Phase
+            L1MIN = 282,     ///< LFO 1 Minimum Value
+            L1MAX = 283,     ///< LFO 1 Maximum Value
+            L1AMT = 284,     ///< LFO 1 Amount
+            L1DST = 285,     ///< LFO 1 Distortion
+            L1RND = 286,     ///< LFO 1 Randomness
 
-            L5FRQ = 297,     ///< LFO 5 Frequency
-            L5PHS = 298,     ///< LFO 5 Phase
-            L5MIN = 299,     ///< LFO 5 Minimum Value
-            L5MAX = 300,     ///< LFO 5 Maximum Value
-            L5AMT = 301,     ///< LFO 5 Amount
-            L5DST = 302,     ///< LFO 5 Distortion
-            L5RND = 303,     ///< LFO 5 Randomness
+            L2FRQ = 287,     ///< LFO 2 Frequency
+            L2PHS = 288,     ///< LFO 2 Phase
+            L2MIN = 289,     ///< LFO 2 Minimum Value
+            L2MAX = 290,     ///< LFO 2 Maximum Value
+            L2AMT = 291,     ///< LFO 2 Amount
+            L2DST = 292,     ///< LFO 2 Distortion
+            L2RND = 293,     ///< LFO 2 Randomness
 
-            L6FRQ = 304,     ///< LFO 6 Frequency
-            L6PHS = 305,     ///< LFO 6 Phase
-            L6MIN = 306,     ///< LFO 6 Minimum Value
-            L6MAX = 307,     ///< LFO 6 Maximum Value
-            L6AMT = 308,     ///< LFO 6 Amount
-            L6DST = 309,     ///< LFO 6 Distortion
-            L6RND = 310,     ///< LFO 6 Randomness
+            L3FRQ = 294,     ///< LFO 3 Frequency
+            L3PHS = 295,     ///< LFO 3 Phase
+            L3MIN = 296,     ///< LFO 3 Minimum Value
+            L3MAX = 297,     ///< LFO 3 Maximum Value
+            L3AMT = 298,     ///< LFO 3 Amount
+            L3DST = 299,     ///< LFO 3 Distortion
+            L3RND = 300,     ///< LFO 3 Randomness
 
-            L7FRQ = 311,     ///< LFO 7 Frequency
-            L7PHS = 312,     ///< LFO 7 Phase
-            L7MIN = 313,     ///< LFO 7 Minimum Value
-            L7MAX = 314,     ///< LFO 7 Maximum Value
-            L7AMT = 315,     ///< LFO 7 Amount
-            L7DST = 316,     ///< LFO 7 Distortion
-            L7RND = 317,     ///< LFO 7 Randomness
+            L4FRQ = 301,     ///< LFO 4 Frequency
+            L4PHS = 302,     ///< LFO 4 Phase
+            L4MIN = 303,     ///< LFO 4 Minimum Value
+            L4MAX = 304,     ///< LFO 4 Maximum Value
+            L4AMT = 305,     ///< LFO 4 Amount
+            L4DST = 306,     ///< LFO 4 Distortion
+            L4RND = 307,     ///< LFO 4 Randomness
 
-            L8FRQ = 318,     ///< LFO 8 Frequency
-            L8PHS = 319,     ///< LFO 8 Phase
-            L8MIN = 320,     ///< LFO 8 Minimum Value
-            L8MAX = 321,     ///< LFO 8 Maximum Value
-            L8AMT = 322,     ///< LFO 8 Amount
-            L8DST = 323,     ///< LFO 8 Distortion
-            L8RND = 324,     ///< LFO 8 Randomness
+            L5FRQ = 308,     ///< LFO 5 Frequency
+            L5PHS = 309,     ///< LFO 5 Phase
+            L5MIN = 310,     ///< LFO 5 Minimum Value
+            L5MAX = 311,     ///< LFO 5 Maximum Value
+            L5AMT = 312,     ///< LFO 5 Amount
+            L5DST = 313,     ///< LFO 5 Distortion
+            L5RND = 314,     ///< LFO 5 Randomness
 
-            MODE = 325,      ///< Mode
+            L6FRQ = 315,     ///< LFO 6 Frequency
+            L6PHS = 316,     ///< LFO 6 Phase
+            L6MIN = 317,     ///< LFO 6 Minimum Value
+            L6MAX = 318,     ///< LFO 6 Maximum Value
+            L6AMT = 319,     ///< LFO 6 Amount
+            L6DST = 320,     ///< LFO 6 Distortion
+            L6RND = 321,     ///< LFO 6 Randomness
 
-            MWAV = 326,      ///< Modulator Waveform
-            CWAV = 327,      ///< Carrier Waveform
+            L7FRQ = 322,     ///< LFO 7 Frequency
+            L7PHS = 323,     ///< LFO 7 Phase
+            L7MIN = 324,     ///< LFO 7 Minimum Value
+            L7MAX = 325,     ///< LFO 7 Maximum Value
+            L7AMT = 326,     ///< LFO 7 Amount
+            L7DST = 327,     ///< LFO 7 Distortion
+            L7RND = 328,     ///< LFO 7 Randomness
 
-            MF1TYP = 328,    ///< Modulator Filter 1 Type
-            MF2TYP = 329,    ///< Modulator Filter 2 Type
-            CF1TYP = 330,    ///< Carrier Filter 1 Type
-            CF2TYP = 331,    ///< Carrier Filter 2 Type
-            EF1TYP = 332,    ///< Effects Filter 1 Type
-            EF2TYP = 333,    ///< Effects Filter 2 Type
+            L8FRQ = 329,     ///< LFO 8 Frequency
+            L8PHS = 330,     ///< LFO 8 Phase
+            L8MIN = 331,     ///< LFO 8 Minimum Value
+            L8MAX = 332,     ///< LFO 8 Maximum Value
+            L8AMT = 333,     ///< LFO 8 Amount
+            L8DST = 334,     ///< LFO 8 Distortion
+            L8RND = 335,     ///< LFO 8 Randomness
 
-            L1WAV = 334,     ///< LFO 1 Waveform
-            L2WAV = 335,     ///< LFO 2 Waveform
-            L3WAV = 336,     ///< LFO 3 Waveform
-            L4WAV = 337,     ///< LFO 4 Waveform
-            L5WAV = 338,     ///< LFO 5 Waveform
-            L6WAV = 339,     ///< LFO 6 Waveform
-            L7WAV = 340,     ///< LFO 7 Waveform
-            L8WAV = 341,     ///< LFO 8 Waveform
+            MODE = 336,      ///< Mode
 
-            L1CEN = 342,     ///< LFO 1 Center
-            L2CEN = 343,     ///< LFO 2 Center
-            L3CEN = 344,     ///< LFO 3 Center
-            L4CEN = 345,     ///< LFO 4 Center
-            L5CEN = 346,     ///< LFO 5 Center
-            L6CEN = 347,     ///< LFO 6 Center
-            L7CEN = 348,     ///< LFO 7 Center
-            L8CEN = 349,     ///< LFO 8 Center
+            MWAV = 337,      ///< Modulator Waveform
+            CWAV = 338,      ///< Carrier Waveform
 
-            L1SYN = 350,     ///< LFO 1 Tempo Synchronization
-            L2SYN = 351,     ///< LFO 2 Tempo Synchronization
-            L3SYN = 352,     ///< LFO 3 Tempo Synchronization
-            L4SYN = 353,     ///< LFO 4 Tempo Synchronization
-            L5SYN = 354,     ///< LFO 5 Tempo Synchronization
-            L6SYN = 355,     ///< LFO 6 Tempo Synchronization
-            L7SYN = 356,     ///< LFO 7 Tempo Synchronization
-            L8SYN = 357,     ///< LFO 8 Tempo Synchronization
+            MF1TYP = 339,    ///< Modulator Filter 1 Type
+            MF2TYP = 340,    ///< Modulator Filter 2 Type
+            CF1TYP = 341,    ///< Carrier Filter 1 Type
+            CF2TYP = 342,    ///< Carrier Filter 2 Type
+            EF1TYP = 343,    ///< Effects Filter 1 Type
+            EF2TYP = 344,    ///< Effects Filter 2 Type
 
-            ECSYN = 358,     ///< Effects Chorus Tempo Synchronization
+            L1WAV = 345,     ///< LFO 1 Waveform
+            L2WAV = 346,     ///< LFO 2 Waveform
+            L3WAV = 347,     ///< LFO 3 Waveform
+            L4WAV = 348,     ///< LFO 4 Waveform
+            L5WAV = 349,     ///< LFO 5 Waveform
+            L6WAV = 350,     ///< LFO 6 Waveform
+            L7WAV = 351,     ///< LFO 7 Waveform
+            L8WAV = 352,     ///< LFO 8 Waveform
 
-            EESYN = 359,     ///< Effects Echo Tempo Synchronization
+            L1CEN = 353,     ///< LFO 1 Center
+            L2CEN = 354,     ///< LFO 2 Center
+            L3CEN = 355,     ///< LFO 3 Center
+            L4CEN = 356,     ///< LFO 4 Center
+            L5CEN = 357,     ///< LFO 5 Center
+            L6CEN = 358,     ///< LFO 6 Center
+            L7CEN = 359,     ///< LFO 7 Center
+            L8CEN = 360,     ///< LFO 8 Center
 
-            MF1LOG = 360,    ///< Modulator Filter 1 Logarithmic Frequency
-            MF2LOG = 361,    ///< Modulator Filter 2 Logarithmic Frequency
-            CF1LOG = 362,    ///< Carrier Filter 1 Logarithmic Frequency
-            CF2LOG = 363,    ///< Carrier Filter 2 Logarithmic Frequency
-            EF1LOG = 364,    ///< Effects Filter 1 Logarithmic Frequency
-            EF2LOG = 365,    ///< Effects Filter 2 Logarithmic Frequency
-            ECLOG = 366,     ///< Effects Chorus Logarithmic Filter Frequencies
-            EELOG = 367,     ///< Effects Echo Logarithmic Filter Frequencies
-            ERLOG = 368,     ///< Effects Reverb Logarithmic Filter Frequencies
+            L1SYN = 361,     ///< LFO 1 Tempo Synchronization
+            L2SYN = 362,     ///< LFO 2 Tempo Synchronization
+            L3SYN = 363,     ///< LFO 3 Tempo Synchronization
+            L4SYN = 364,     ///< LFO 4 Tempo Synchronization
+            L5SYN = 365,     ///< LFO 5 Tempo Synchronization
+            L6SYN = 366,     ///< LFO 6 Tempo Synchronization
+            L7SYN = 367,     ///< LFO 7 Tempo Synchronization
+            L8SYN = 368,     ///< LFO 8 Tempo Synchronization
 
-            N1DYN = 369,     ///< Envelope 1 Dynamic
-            N2DYN = 370,     ///< Envelope 2 Dynamic
-            N3DYN = 371,     ///< Envelope 3 Dynamic
-            N4DYN = 372,     ///< Envelope 4 Dynamic
-            N5DYN = 373,     ///< Envelope 5 Dynamic
-            N6DYN = 374,     ///< Envelope 6 Dynamic
+            ECSYN = 369,     ///< Effects Chorus Tempo Synchronization
+            EESYN = 370,     ///< Effects Echo Tempo Synchronization
 
-            MAX_PARAM_ID = 375
+            MF1LOG = 371,    ///< Modulator Filter 1 Logarithmic Frequency
+            MF2LOG = 372,    ///< Modulator Filter 2 Logarithmic Frequency
+            CF1LOG = 373,    ///< Carrier Filter 1 Logarithmic Frequency
+            CF2LOG = 374,    ///< Carrier Filter 2 Logarithmic Frequency
+            EF1LOG = 375,    ///< Effects Filter 1 Logarithmic Frequency
+            EF2LOG = 376,    ///< Effects Filter 2 Logarithmic Frequency
+            ECLOG = 377,     ///< Effects Chorus Logarithmic Filter Frequencies
+            EELOG = 378,     ///< Effects Echo Logarithmic Filter Frequencies
+            ERLOG = 379,     ///< Effects Reverb Logarithmic Filter Frequencies
+
+            N1DYN = 380,     ///< Envelope 1 Dynamic
+            N2DYN = 381,     ///< Envelope 2 Dynamic
+            N3DYN = 382,     ///< Envelope 3 Dynamic
+            N4DYN = 383,     ///< Envelope 4 Dynamic
+            N5DYN = 384,     ///< Envelope 5 Dynamic
+            N6DYN = 385,     ///< Envelope 6 Dynamic
+
+            POLY = 386,      ///< Polyphonic
+
+            ERTYP = 387,     ///< Effects Reverb Type
+
+            ECTYP = 388,     ///< Effects Chorus Type
+
+            MAX_PARAM_ID = 389
         };
 
         static constexpr Integer FLOAT_PARAMS = ParamId::MODE;
@@ -611,16 +640,16 @@ class Synth : public Midi::EventHandler, public SignalProducer
             PITCH_WHEEL =               128,                        ///< Pitch Wheel
             NOTE =                      129,                        ///< Note
             VELOCITY =                  130,                        ///< Velocity
-            FLEXIBLE_CONTROLLER_1 =     131,                        ///< Flexible Controller 1
-            FLEXIBLE_CONTROLLER_2 =     132,                        ///< Flexible Controller 2
-            FLEXIBLE_CONTROLLER_3 =     133,                        ///< Flexible Controller 3
-            FLEXIBLE_CONTROLLER_4 =     134,                        ///< Flexible Controller 4
-            FLEXIBLE_CONTROLLER_5 =     135,                        ///< Flexible Controller 5
-            FLEXIBLE_CONTROLLER_6 =     136,                        ///< Flexible Controller 6
-            FLEXIBLE_CONTROLLER_7 =     137,                        ///< Flexible Controller 7
-            FLEXIBLE_CONTROLLER_8 =     138,                        ///< Flexible Controller 8
-            FLEXIBLE_CONTROLLER_9 =     139,                        ///< Flexible Controller 9
-            FLEXIBLE_CONTROLLER_10 =    140,                        ///< Flexible Controller 10
+            MACRO_1 =                   131,                        ///< Macro 1
+            MACRO_2 =                   132,                        ///< Macro 2
+            MACRO_3 =                   133,                        ///< Macro 3
+            MACRO_4 =                   134,                        ///< Macro 4
+            MACRO_5 =                   135,                        ///< Macro 5
+            MACRO_6 =                   136,                        ///< Macro 6
+            MACRO_7 =                   137,                        ///< Macro 7
+            MACRO_8 =                   138,                        ///< Macro 8
+            MACRO_9 =                   139,                        ///< Macro 9
+            MACRO_10 =                  140,                        ///< Macro 10
             LFO_1 =                     141,                        ///< LFO 1
             LFO_2 =                     142,                        ///< LFO 2
             LFO_3 =                     143,                        ///< LFO 3
@@ -637,18 +666,24 @@ class Synth : public Midi::EventHandler, public SignalProducer
             ENVELOPE_6 =                154,                        ///< Envelope 6
             CHANNEL_PRESSURE =          155,                        ///< Channel Pressure
             MIDI_LEARN =                156,                        ///< MIDI Learn
-            FLEXIBLE_CONTROLLER_11 =    157,                        ///< Flexible Controller 11
-            FLEXIBLE_CONTROLLER_12 =    158,                        ///< Flexible Controller 12
-            FLEXIBLE_CONTROLLER_13 =    159,                        ///< Flexible Controller 13
-            FLEXIBLE_CONTROLLER_14 =    160,                        ///< Flexible Controller 14
-            FLEXIBLE_CONTROLLER_15 =    161,                        ///< Flexible Controller 15
-            FLEXIBLE_CONTROLLER_16 =    162,                        ///< Flexible Controller 16
-            FLEXIBLE_CONTROLLER_17 =    163,                        ///< Flexible Controller 17
-            FLEXIBLE_CONTROLLER_18 =    164,                        ///< Flexible Controller 18
-            FLEXIBLE_CONTROLLER_19 =    165,                        ///< Flexible Controller 19
-            FLEXIBLE_CONTROLLER_20 =    166,                        ///< Flexible Controller 20
+            MACRO_11 =                  157,                        ///< Macro 11
+            MACRO_12 =                  158,                        ///< Macro 12
+            MACRO_13 =                  159,                        ///< Macro 13
+            MACRO_14 =                  160,                        ///< Macro 14
+            MACRO_15 =                  161,                        ///< Macro 15
+            MACRO_16 =                  162,                        ///< Macro 16
+            MACRO_17 =                  163,                        ///< Macro 17
+            MACRO_18 =                  164,                        ///< Macro 18
+            MACRO_19 =                  165,                        ///< Macro 19
+            MACRO_20 =                  166,                        ///< Macro 20
 
-            MAX_CONTROLLER_ID =         167,
+            OSC_1_PEAK =                167,                        ///< Oscillator 1 Peak
+            OSC_2_PEAK =                168,                        ///< Oscillator 1 Peak
+            VOL_1_PEAK =                169,                        ///< Volume 1 Peak
+            VOL_2_PEAK =                170,                        ///< Volume 2 Peak
+            VOL_3_PEAK =                171,                        ///< Volume 3 Peak
+
+            MAX_CONTROLLER_ID =         172,
         };
 
         typedef Byte Mode;
@@ -674,7 +709,9 @@ class Synth : public Midi::EventHandler, public SignalProducer
         {
             public:
                 Message() noexcept;
-                Message(Message const& message) noexcept;
+                Message(Message const& message) noexcept = default;
+                Message(Message&& message) noexcept = default;
+
                 Message(
                     MessageType const type,
                     ParamId const param_id,
@@ -682,8 +719,8 @@ class Synth : public Midi::EventHandler, public SignalProducer
                     Byte const byte_param
                 ) noexcept;
 
-                Message& operator=(Message const& message) noexcept;
-                Message& operator=(Message const&& message) noexcept;
+                Message& operator=(Message const& message) noexcept = default;
+                Message& operator=(Message&& message) noexcept = default;
 
                 MessageType type;
                 ParamId param_id;
@@ -691,7 +728,7 @@ class Synth : public Midi::EventHandler, public SignalProducer
                 Byte byte_param;
         };
 
-        class ModeParam : public Param<Mode>
+        class ModeParam : public Param<Mode, ParamEvaluation::BLOCK>
         {
             public:
                 ModeParam(std::string const name) noexcept;
@@ -709,8 +746,12 @@ class Synth : public Midi::EventHandler, public SignalProducer
         virtual ~Synth() override;
 
         virtual void set_sample_rate(Frequency const new_sample_rate) noexcept override;
+        virtual void reset() noexcept override;
 
         bool is_lock_free() const noexcept;
+
+        bool is_dirty() const noexcept;
+        void clear_dirty_flag() noexcept;
 
         void suspend() noexcept;
         void resume() noexcept;
@@ -737,6 +778,21 @@ class Synth : public Midi::EventHandler, public SignalProducer
         void push_message(Message const& message) noexcept;
 
         void process_messages() noexcept;
+
+        /**
+         * \brief Process a state changing message inside the audio thread.
+         */
+        void process_message(
+            MessageType const message,
+            ParamId const param_id,
+            Number const number_param,
+            Byte const byte_param
+        ) noexcept;
+
+        /**
+         * \brief Process a state changing message inside the audio thread.
+         */
+        void process_message(Message const& message) noexcept;
 
         std::string const& get_param_name(ParamId const param_id) const noexcept;
         ParamId get_param_id(std::string const& name) const noexcept;
@@ -819,11 +875,12 @@ class Synth : public Midi::EventHandler, public SignalProducer
             Seconds const time_offset, Midi::Channel const channel
         ) noexcept;
 
+        ToggleParam polyphonic;
         ModeParam mode;
-        FloatParam modulator_add_volume;
-        FloatParam phase_modulation_level;
-        FloatParam frequency_modulation_level;
-        FloatParam amplitude_modulation_level;
+        FloatParamS modulator_add_volume;
+        FloatParamS phase_modulation_level;
+        FloatParamS frequency_modulation_level;
+        FloatParamS amplitude_modulation_level;
 
         Modulator::Params modulator_params;
         Carrier::Params carrier_params;
@@ -832,6 +889,11 @@ class Synth : public Midi::EventHandler, public SignalProducer
         MidiController note;
         MidiController velocity;
         MidiController channel_pressure_ctl;
+        MidiController osc_1_peak;
+        MidiController osc_2_peak;
+        MidiController vol_1_peak;
+        MidiController vol_2_peak;
+        MidiController vol_3_peak;
 
     protected:
         Sample const* const* initialize_rendering(
@@ -846,39 +908,14 @@ class Synth : public Midi::EventHandler, public SignalProducer
             Sample** buffer
         ) noexcept;
 
+        void finalize_rendering(
+            Integer const round,
+            Integer const sample_count
+        ) noexcept;
+
         Frequency frequencies[Midi::NOTES];
 
     private:
-        /*
-        See Timur Doumler [ACCU 2017]: Lock-free programming with modern C++
-          https://www.youtube.com/watch?v=qdrp6k4rcP4
-        */
-        class SingleProducerSingleConsumerMessageQueue
-        {
-            public:
-                SingleProducerSingleConsumerMessageQueue() noexcept;
-
-                SingleProducerSingleConsumerMessageQueue(
-                    SingleProducerSingleConsumerMessageQueue const& queue
-                ) = delete;
-
-                bool is_lock_free() const noexcept;
-                bool push(Message const& message) noexcept;
-                bool pop(Message& message) noexcept;
-                size_t size() const noexcept;
-
-            private:
-                static constexpr size_t SIZE = 0x1000; /* must be power of 2 */
-                static constexpr size_t SIZE_MASK = SIZE - 1;
-
-                size_t advance(size_t const index) const noexcept;
-
-                Message messages[SIZE];
-
-                std::atomic<size_t> next_push;
-                std::atomic<size_t> next_pop;
-        };
-
         class Bus : public SignalProducer
         {
             friend class SignalProducer;
@@ -889,7 +926,25 @@ class Synth : public Midi::EventHandler, public SignalProducer
                     Modulator* const* const modulators,
                     Carrier* const* const carriers,
                     Integer const polyphony,
-                    FloatParam& modulator_add_volume
+                    FloatParamS& modulator_add_volume
+                ) noexcept;
+
+                virtual ~Bus();
+
+                virtual void set_block_size(
+                    Integer const new_block_size
+                ) noexcept override;
+
+                void find_modulators_peak(
+                    Integer const sample_count,
+                    Sample& peak,
+                    Integer& peak_index
+                ) noexcept;
+
+                void find_carriers_peak(
+                    Integer const sample_count,
+                    Sample& peak,
+                    Integer& peak_index
                 ) noexcept;
 
             protected:
@@ -906,28 +961,40 @@ class Synth : public Midi::EventHandler, public SignalProducer
                 ) noexcept;
 
             private:
+                void allocate_buffers() noexcept;
+                void free_buffers() noexcept;
+                void reallocate_buffers() noexcept;
+
+                void mix_modulators(
+                    Integer const round,
+                    Integer const first_sample_index,
+                    Integer const last_sample_index
+                ) const noexcept;
+
+                template<bool is_additive_volume_constant>
                 void mix_modulators(
                     Integer const round,
                     Integer const first_sample_index,
                     Integer const last_sample_index,
-                    Sample** buffer
+                    Sample const add_volume_value,
+                    Sample const* add_volume_buffer
                 ) const noexcept;
 
                 void mix_carriers(
                     Integer const round,
                     Integer const first_sample_index,
-                    Integer const last_sample_index,
-                    Sample** buffer
+                    Integer const last_sample_index
                 ) const noexcept;
 
                 Integer const polyphony;
                 Synth::Modulator* const* const modulators;
                 Synth::Carrier* const* const carriers;
-                FloatParam& modulator_add_volume;
+                FloatParamS& modulator_add_volume;
                 Sample const* modulator_add_volume_buffer;
+                Sample** modulators_buffer;
+                Sample** carriers_buffer;
                 std::vector<bool> modulators_on;
                 std::vector<bool> carriers_on;
-                bool is_silent;
         };
 
         class ParamIdHashTable
@@ -983,35 +1050,39 @@ class Synth : public Midi::EventHandler, public SignalProducer
         {
             public:
                 MidiControllerMessage();
+                MidiControllerMessage(MidiControllerMessage const& message) = default;
+                MidiControllerMessage(MidiControllerMessage&& message) = default;
 
                 MidiControllerMessage(Seconds const time_offset, Midi::Word const value);
 
                 bool operator==(MidiControllerMessage const& message) const noexcept;
-                MidiControllerMessage& operator=(MidiControllerMessage const& message) noexcept;
-                MidiControllerMessage& operator=(MidiControllerMessage const&& message) noexcept;
+                MidiControllerMessage& operator=(MidiControllerMessage const& message) noexcept = default;
+                MidiControllerMessage& operator=(MidiControllerMessage&& message) noexcept = default;
 
             private:
                 Seconds time_offset;
                 Midi::Word value;
         };
 
-        class DelayedNoteOff
+        class DeferredNoteOff
         {
             public:
-                DelayedNoteOff();
-                DelayedNoteOff(DelayedNoteOff const& delayed_note_off);
-                DelayedNoteOff(DelayedNoteOff const&& delayed_note_off);
+                DeferredNoteOff();
+                DeferredNoteOff(DeferredNoteOff const& deferred_note_off) = default;
+                DeferredNoteOff(DeferredNoteOff&& deferred_note_off) = default;
 
-                DelayedNoteOff(
+                DeferredNoteOff(
+                    Integer const note_id,
                     Midi::Channel const channel,
                     Midi::Note const note,
                     Midi::Byte const velocity,
                     Integer const voice
                 );
 
-                DelayedNoteOff& operator=(DelayedNoteOff const& delayed_note_off) noexcept;
-                DelayedNoteOff& operator=(DelayedNoteOff const&& delayed_note_off) noexcept;
+                DeferredNoteOff& operator=(DeferredNoteOff const& deferred_note_off) noexcept = default;
+                DeferredNoteOff& operator=(DeferredNoteOff&& deferred_note_off) noexcept = default;
 
+                Integer get_note_id() const noexcept;
                 Midi::Channel get_channel() const noexcept;
                 Midi::Note get_note() const noexcept;
                 Midi::Byte get_velocity() const noexcept;
@@ -1019,15 +1090,20 @@ class Synth : public Midi::EventHandler, public SignalProducer
 
             private:
                 Integer voice;
+                Integer note_id;
                 Midi::Channel channel;
                 Midi::Note note;
                 Midi::Byte velocity;
         };
 
+        static constexpr SPSCQueue<Message>::SizeType MESSAGE_QUEUE_SIZE = 8192;
+
         static constexpr Number MIDI_WORD_SCALE = 1.0 / 16384.0;
         static constexpr Number MIDI_BYTE_SCALE = 1.0 / 127.0;
 
         static constexpr Integer INVALID_VOICE = -1;
+
+        static constexpr Integer NOTE_ID_MASK = 0x7fffffff;
 
         static std::vector<bool> supported_midi_controllers;
         static bool supported_midi_controllers_initialized;
@@ -1042,7 +1118,7 @@ class Synth : public Midi::EventHandler, public SignalProducer
         void register_effects_params() noexcept;
         void create_voices() noexcept;
         void create_midi_controllers() noexcept;
-        void create_flexible_controllers() noexcept;
+        void create_macros() noexcept;
         void create_envelopes() noexcept;
         void create_lfos() noexcept;
 
@@ -1054,16 +1130,6 @@ class Synth : public Midi::EventHandler, public SignalProducer
 
         template<class ParamClass>
         void register_param(ParamId const param_id, ParamClass& param) noexcept;
-
-        void register_float_param_as_child(
-            ParamId const param_id,
-            FloatParam& float_param
-        ) noexcept;
-
-        void register_float_param(
-            ParamId const param_id,
-            FloatParam& float_param
-        ) noexcept;
 
         Number midi_byte_to_float(Midi::Byte const midi_byte) const noexcept;
         Number midi_word_to_float(Midi::Word const midi_word) const noexcept;
@@ -1095,13 +1161,14 @@ class Synth : public Midi::EventHandler, public SignalProducer
 
         void handle_clear() noexcept;
 
-        bool assign_controller_to_param(
+        bool assign_controller_to_discrete_param(
             ParamId const param_id,
             ControllerId const controller_id
         ) noexcept;
 
-        bool assign_controller_to_float_param(
-            ParamId const param_id,
+        template<class FloatParamClass>
+        bool assign_controller(
+            FloatParamClass& param,
             ControllerId const controller_id
         ) noexcept;
 
@@ -1113,25 +1180,71 @@ class Synth : public Midi::EventHandler, public SignalProducer
 
         void clear_sustain() noexcept;
 
+        void note_on_polyphonic(
+            Seconds const time_offset,
+            Midi::Channel const channel,
+            Midi::Note const note,
+            Number const velocity
+        ) noexcept;
+
+        void note_on_monophonic(
+            Seconds const time_offset,
+            Midi::Channel const channel,
+            Midi::Note const note,
+            Number const velocity,
+            bool const trigger_if_off
+        ) noexcept;
+
+        void trigger_note_on_voice(
+            Integer const voice,
+            Seconds const time_offset,
+            Midi::Channel const channel,
+            Midi::Note const note,
+            Number const velocity
+        ) noexcept;
+
+        template<class VoiceClass>
+        void trigger_note_on_voice_monophonic(
+            VoiceClass& voice,
+            bool const is_off,
+            Seconds const time_offset,
+            Midi::Channel const channel,
+            Midi::Note const note,
+            Number const velocity
+        ) noexcept;
+
+        void assign_voice_and_note_id(
+            Integer const voice,
+            Midi::Channel const channel,
+            Midi::Note const note
+        ) noexcept;
+
+        void stop_polyphonic_notes() noexcept;
+
         void update_param_states() noexcept;
 
         void garbage_collect_voices() noexcept;
 
         std::string const to_string(Integer const) const noexcept;
 
-        std::vector<DelayedNoteOff> delayed_note_offs;
-        SingleProducerSingleConsumerMessageQueue messages;
+        std::vector<DeferredNoteOff> deferred_note_offs;
+        SPSCQueue<Message> messages;
         Bus bus;
-        Effects::Effects<Bus> effects;
+        NoteStack note_stack;
+        PeakTracker osc_1_peak_tracker;
+        PeakTracker osc_2_peak_tracker;
+        PeakTracker vol_1_peak_tracker;
+        PeakTracker vol_2_peak_tracker;
+        PeakTracker vol_3_peak_tracker;
+
         Sample const* const* raw_output;
         MidiControllerMessage previous_controller_message[ControllerId::MAX_CONTROLLER_ID];
-        FloatParam* float_params[FLOAT_PARAMS];
         BiquadFilterSharedCache* biquad_filter_shared_caches[4];
         std::atomic<Number> param_ratios[ParamId::MAX_PARAM_ID];
         std::atomic<Byte> controller_assignments[ParamId::MAX_PARAM_ID];
         Envelope* envelopes_rw[ENVELOPES];
         LFO* lfos_rw[LFOS];
-        FlexibleController* flexible_controllers_rw[FLEXIBLE_CONTROLLERS];
+        Macro* macros_rw[MACROS];
         MidiController* midi_controllers_rw[MIDI_CONTROLLERS];
         Integer midi_note_to_voice_assignments[Midi::CHANNELS][Midi::NOTES];
         Modulator* modulators[POLYPHONY];
@@ -1139,13 +1252,18 @@ class Synth : public Midi::EventHandler, public SignalProducer
         Integer samples_since_gc;
         Integer samples_between_gc;
         Integer next_voice;
+        Integer next_note_id;
         Midi::Note previous_note;
         bool is_learning;
         bool is_sustaining;
+        bool is_polyphonic;
+        bool was_polyphonic;
+        bool is_dirty_;
 
     public:
+        Effects::Effects<Bus> effects;
         MidiController* const* const midi_controllers;
-        FlexibleController* const* const flexible_controllers;
+        Macro* const* const macros;
         Envelope* const* const envelopes;
         LFO* const* const lfos;
 };

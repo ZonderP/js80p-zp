@@ -31,7 +31,7 @@ template<class InputSignalProducerClass>
 Echo<InputSignalProducerClass>::Echo(
         std::string const name,
         InputSignalProducerClass& input
-) : Effect<InputSignalProducerClass>(name, input, 14),
+) : SideChainCompressableEffect<InputSignalProducerClass>(name, input, 14),
     delay_time(
         name + "DEL",
         Constants::DELAY_TIME_MIN,
@@ -52,10 +52,8 @@ Echo<InputSignalProducerClass>::Echo(
         0.0,
         &log_scale_frequencies,
         Math::log_biquad_filter_freq_table(),
-        Math::log_biquad_filter_freq_inv_table(),
         Math::LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX,
-        Math::LOG_BIQUAD_FILTER_FREQ_SCALE,
-        Math::LOG_BIQUAD_FILTER_FREQ_INV_SCALE
+        Math::LOG_BIQUAD_FILTER_FREQ_SCALE
     ),
     damping_gain(name + "DG", -36.0, -0.01, -6.0),
     width(name + "WID", -1.0, 1.0, 0.0),
@@ -67,10 +65,8 @@ Echo<InputSignalProducerClass>::Echo(
         0.0,
         &log_scale_frequencies,
         Math::log_biquad_filter_freq_table(),
-        Math::log_biquad_filter_freq_inv_table(),
         Math::LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX,
-        Math::LOG_BIQUAD_FILTER_FREQ_SCALE,
-        Math::LOG_BIQUAD_FILTER_FREQ_INV_SCALE
+        Math::LOG_BIQUAD_FILTER_FREQ_SCALE
     ),
     tempo_sync(name + "SYN", ToggleParam::OFF),
     log_scale_frequencies(name + "LOG", ToggleParam::OFF),
@@ -137,6 +133,9 @@ Echo<InputSignalProducerClass>::Echo(
     high_pass_filter_type.set_value(HighPassedInput::HIGH_PASS);
 
     comb_filter_1.delay.set_feedback_signal_producer(&comb_filter_2.high_shelf_filter);
+
+    comb_filter_1.high_shelf_filter.set_shared_cache(&high_shelf_filter_shared_cache);
+    comb_filter_2.high_shelf_filter.set_shared_cache(&high_shelf_filter_shared_cache);
 }
 
 
@@ -146,7 +145,9 @@ Sample const* const* Echo<InputSignalProducerClass>::initialize_rendering(
         Integer const sample_count
 ) noexcept {
     Sample const* const* const buffer = (
-        Effect<InputSignalProducerClass>::initialize_rendering(round, sample_count)
+        SideChainCompressableEffect<InputSignalProducerClass>::initialize_rendering(
+            round, sample_count
+        )
     );
 
     if (buffer != NULL) {
@@ -179,7 +180,7 @@ void Echo<InputSignalProducerClass>::render(
         }
     }
 
-    Effect<InputSignalProducerClass>::render(
+    SideChainCompressableEffect<InputSignalProducerClass>::render(
         round, first_sample_index, last_sample_index, buffer
     );
 }

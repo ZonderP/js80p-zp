@@ -62,12 +62,16 @@ Table of Contents
     * [Ambient Pad 3](#preset-ambient-pad-3)
     * [Saw Piano](#preset-saw-piano)
     * [Saw Piano Reversed](#preset-saw-piano-reversed)
+    * [Nightmare Lead](#preset-nightmare-lead)
+    * [Tremolo Lead](#preset-tremolo-lead)
+    * [Monophonic Saw](#preset-monophonic-saw)
  * [Bugs](#bugs)
  * [Signal Chain (Simplified)](#signal)
  * [Features](#features)
  * [Frequenctly Asked Questions](#faq)
     * [Which distribution should I download?](#faq-which)
     * [Mac version?](#faq-mac)
+    * [Parameters, Envelopes, and polyphony: how do they work?](#faq-params-polyphony)
     * [The knobs in the Custom Waveform harmonics secion don't do anything, is this a bug?](#faq-custom-wave)
     * [How can parameters be automated? What parameters does the plugin export?](#faq-automation)
     * [Aren't Phase Modulation and Frequency Modulation equivalent? Why have both?](#faq-pm-fm)
@@ -86,8 +90,9 @@ Table of Contents
 System Requirements
 -------------------
 
- * Operating System: Windows 7 or newer, or Linux (e.g. Ubuntu 20.04 or newer)
+ * Operating System: Windows 7 or newer, or Linux (e.g. Ubuntu 22.04)
  * CPU: SSE2 support, 32 bit (i686) or 64 bit (x86-64)
+    * separate packages are available for AVX capable 64 bit processors
  * RAM: 150-300 MB per instance, depending on buffer sizes, etc.
 
 Tested with [REAPER](https://www.reaper.fm/) 6.79.
@@ -115,14 +120,21 @@ Installation
 
 If your plugin host application does not support VST 3, but does support
 VST 2.4, then you have to download and install the FST version of JS80P.
-Otherwise, you should go with the VST 3 bundle on all supported operating
-systems.
+Otherwise, you should go with the VST 3 bundle on both Windows and Linux.
+
+If your CPU supports [AVX instructions](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions)
+and you use a 64 bit plugin host application, then you should download a JS80P
+package that is optimized for AVX compatible processors. If you have an older
+computer, or if you experience crashes, then you should go with one of the
+[SSE2](https://en.wikipedia.org/wiki/SSE2) compatible JS80P packages.
 
 If your plugin host application fails to recognize JS80P from the VST 3 bundle,
 then you have to download and install the VST 3 Single File version that
 matches the CPU architecture for which your plugin host application was built.
+
 (For example, some 32 bit (i686) versions of Reaper are known to be unable to
-recognize VST 3 bundles when running on a 64 bit system.)
+recognize VST 3 bundles when running on a 64 bit Linux system, so you would
+have to download the 32 bit VST 3 Single File JS80P package.)
 
 <a id="vst3-bundle-windows"></a>
 
@@ -432,6 +444,30 @@ a recording backwards. The time it takes for notes to un-decay depends on
 note pitch and velocity. The harder you play, the brighter and richer the
 sound gets. Mod wheel controls the vibrato, aftertouch adjusts the filtering.
 
+<a id="preset-nightmare-lead"></a>
+
+### Nightmare Lead
+
+Starts out as a nice, filtered sawtooth wave, but as you begin to turn the mod
+wheel and add some aftertouch, it becomes more and more menacing and distorted,
+until it finally descends into madness.
+
+<a id="preset-tremolo-lead"></a>
+
+### Tremolo Lead
+
+Thick lead sound. Aftertouch adds vibrato and harmonics, mod wheel opens up
+the filter and adds a tremolo effect. Filtering also responds to note velocity.
+
+<a id="preset-monophonic-saw"></a>
+
+### Monophonic Saw
+
+A sawtooth wave based monophonic, sustained sound with smooth legato glides.
+The harder you play, the brighter and richer the timbre, and the harder the
+note attack. Mod wheel controls the vibrato, and aftertouch controls the
+filtering and the wavefolder. The sustain pedal lengthens note decay.
+
 <a id="bugs" href="#toc">Table of Contents</a>
 
 Bugs
@@ -444,19 +480,24 @@ If you find bugs, please report them at
 
 Signal Chain (Simplified)
 -------------------------
-                                                        (x64)
-    Oscillator --> Filter --> Wavefolder --> Filter ---------> Mixer --+
-                                                  |            ^       |
-        (Frequency & Amplitude Modulation)        |            |       |
-      +-------------------------------------------+            |       |
-      |                                                        |       |
-      v                                                 (x64)  |       |
-      Oscillator --> Filter --> Wavefolder --> Filter ---------+       |
-                                                                       |
-    Overdrive <--------------------------------------------------------+
-    |
-    v
-    Distortion --> Filter --> Filter --> Chorus --> Echo --> Reverb --> Out
+                                                               (x64)
+    Oscillator --> Filter --> Wavefolder --> Filter --> Volume -----> Mixer --+
+                                                             |        ^       |
+     (Frequency, Phase, and Amplitude Modulation)            |        |       |
+     +-------------------------------------------------------+        |       |
+     |                                                                |       |
+     v                                                          (x64) |       |
+     Oscillator --> Filter --> Wavefolder --> Filter --> Volume ------+       |
+                                                                              |
+            +-----------------------------------------------------------------+
+            |
+            v
+            Volume --> Overdrive --> Distortion --> Filter --> Filter --+
+                                                                        |
+            +-----------------------------------------------------------+
+            |
+            v
+            Volume --> Chorus --> Echo --> Reverb --> Volume --> Out
 
 <a id="features" href="#toc">Table of Contents</a>
 
@@ -464,6 +505,9 @@ Features
 --------
 
  * 64 notes polyphony
+ * last-note priority monophonic mode
+    * legato playing will either retrigger or smoothly glide to the next note,
+      depending on the portamento length setting
  * 2 oscillators with 10 waveforms:
     * sine
     * sawtooth
@@ -494,15 +538,23 @@ Features
     * distortion
     * 2 more filters
     * chorus
-    * stereo echo
-    * stereo reverb
+    * stereo echo (with side-chaining)
+    * stereo reverb (with side-chaining)
+    * volume controls at various points of the signal chain
  * 6 envelopes
  * 8 low-frequency oscillators (LFO)
- * configurable MIDI controllers
+ * MIDI controllers and macros
  * channel pressure (aftertouch)
  * MIDI learn
  * logarithmic and linear scale filter frequencies
  * LFO and effects tempo synchronization
+ * use the peak level at various points of the signal chain to control
+   parameters:
+    * oscillator 1 output
+    * oscillator 2 output
+    * volume control 1 input
+    * volume control 2 input
+    * volume control 3 input
 
 Frequenctly Asked Questions
 ---------------------------
@@ -513,14 +565,21 @@ Frequenctly Asked Questions
 
 If your plugin host application does not support VST 3, but does support
 VST 2.4, then you have to download and install the FST version of JS80P.
-Otherwise, you should go with the VST 3 bundle on all supported operating
-systems.
+Otherwise, you should go with the VST 3 bundle on both Windows and Linux.
+
+If your CPU supports [AVX instructions](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions)
+and you use a 64 bit plugin host application, then you should download a JS80P
+package that is optimized for AVX compatible processors. If you have an older
+computer, or if you experience crashes, then you should go with one of the
+[SSE2](https://en.wikipedia.org/wiki/SSE2) compatible JS80P packages.
 
 If your plugin host application fails to recognize JS80P from the VST 3 bundle,
 then you have to download and install the VST 3 Single File version that
 matches the CPU architecture for which your plugin host application was built.
+
 (For example, some 32 bit (i686) versions of Reaper are known to be unable to
-recognize VST 3 bundles when running on a 64 bit system.)
+recognize VST 3 bundles when running on a 64 bit Linux system, so you would
+have to download the 32 bit VST 3 Single File JS80P package.)
 
 The 32 bit versions are usually only needed by those who deliberately use a 32
 bit plugin host application, e.g. because they want to keep using some really
@@ -544,6 +603,37 @@ would be available (at a reasonable price) for installing it in a virtual
 machine that could be used for testing, I'd consider that. But as long as it
 cannot be obtained (legally) without also buying a Mac, and I'm happy with my
 current computer, I'm not going to invest in a new one.
+
+<a id="faq-params-polyphony" href="#toc">Table of Contents</a>
+
+### Parameters, Envelopes, and polyphony: how do they work?
+
+By default, knobs and toggles act globally. This means that if you adjust a
+knob with your mouse, or if you assign a MIDI value (controller, note velocity,
+etc.), a Macro, or an LFO to it and adjust the parameter via that, or if you
+use <a href="#faq-automation">automation in your plugin host application</a>,
+then that parameter will change for all sounding notes.
+
+But if you assign an Envelope as a controller to a parameter, then each
+polyphonic note will use its own timeline for that parameter, and the
+parameter's value will change over time for each note independently according
+to the envelope's settings. By default, these settings are only evaluated once
+for each note, at the very beginning of the note, so if the parameters of the
+envelope are changed, then it will only affect the notes that start after the
+adjustment.
+
+To have polyphonic notes *sample and hold* a MIDI value or a Macro's momentary
+value for a parameter for the entire duration of the note, independently of
+other notes and subsequent changes of the value (e.g. to use lower filter
+cutoff frequency for low-velocity notes so that they sound softer), then you
+have to use an Envelope: turn up all the levels of the Envelope to 100%, assign
+the MIDI value or the Macro to the Amount parameter of the Envelope, and assign
+the Envelope to control the parameter.
+
+If an Envelope is switched to Dynamic mode, then polyphonic notes will still
+track their own independent timelines for each parameter that has that Envelope
+assigned, but the parameter's value will converge to the value that it should
+have at each moment according to the momentary settings of the Envelope.
 
 <a id="faq-custom-wave" href="#toc">Table of Contents</a>
 
@@ -721,16 +811,16 @@ JS80P and want to compile it themselves.
 
 #### Linux
 
- * [GNU Make 4.2.1+](https://www.gnu.org/software/make/)
- * [G++ 9.3+](https://gcc.gnu.org/)
- * [MinGW-w64 7.0.0+](https://www.mingw-w64.org/)
- * [Valgrind 3.15.0+](https://valgrind.org/)
- * [Doxygen 1.8.17+](https://www.doxygen.nl/)
+ * [GNU Make 4.3+](https://www.gnu.org/software/make/)
+ * [G++ 11.4.0+](https://gcc.gnu.org/)
+ * [MinGW-w64 10+](https://www.mingw-w64.org/)
+ * [Valgrind 3.18.1+](https://valgrind.org/)
+ * [Doxygen 1.9.1+](https://www.doxygen.nl/)
 
 #### Windows
 
- * [WinLibs MinGW-w64 7.0.0+ (MSVCRT)](https://winlibs.com/)
- * [Doxygen 1.8.17+](https://www.doxygen.nl/)
+ * [WinLibs MinGW-w64 13.1.0+ (MSVCRT)](https://winlibs.com/)
+ * [Doxygen 1.9.6+](https://www.doxygen.nl/)
 
 <a id="dev-dep"></a>
 

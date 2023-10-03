@@ -1,3 +1,90 @@
+v2.2.0 (2023-10-03)
+ * New parameter for the Chorus effect: switch between 15 different
+   configurations, with up to 7 voices.
+ * New parameter for the Reverb effect: switch between 10 different tunings.
+
+v2.1.0 (2023-09-28)
+ * Echo and Reverb now support side-chain compression: clean up the sound by
+   reducing the volume of the wet signal while the dry signal is loud, and
+   gradually bring up the wet signal once the dry signal goes below the
+   threshold.
+ * Multiple volume controls have been added to the effect chain. The one before
+   the overdrive and distortion goes up to 200%, allowing the effects to be
+   pushed really hard.
+ * Signal peak levels at various points of the signal chain can now be used for
+   controlling parameters and macros.
+
+v2.0.3 (2023-09-24)
+ * It is now possible to assign Macros to discrete parameters like Filter Types
+   and Waveforms.
+ * Memory and CPU consumption of delay based effects have been reduced, so they
+   will no longer use the CPU when the synth is idle and all sounds have
+   decayed.
+ * Bugfix: fixed a bug with program name saving and loading in the FST plugin.
+
+v2.0.2 (2023-09-16)
+ * Documented how Envelopes work in the synth with regards to polyphony.
+ * Reduced patch size and improved patch import and export performance by
+   omitting redundant information from patches.
+ * Improved responsivity of the FST plugin to host events (by requesting the
+   "effIdle" message from the host) when the plugin's own window is closed or
+   hidden.
+ * Bugfix: fixed possible crashes in the FST plugin when using automation.
+
+v2.0.1 (2023-09-10)
+ * Flexible Controllers have been renamed to Macros.
+ * Reduced RAM and CPU usage, especially when the plugin is idle.
+ * Bugfix: fixed a problem in filter state handling which could lead to
+   occasional signal discontinuities and glitches.
+ * Bugfix: fixed a potential crash around GUI and audio engine communication.
+ * Bugfix: the FST plugin sometimes switched to the blank preset while loading
+   banks, saved projects, or when doing a preset change or MIDI program change.
+
+v2.0.0 (2023-08-16)
+ * Implemented monophonic mode for smooth legato playing
+ * New preset: Monophonic Saw
+
+v1.9.9 (2023-08-03)
+ * Bugfix: initialize MIDI CC 64 (sustain pedal) to 0% instead of 50%. The
+   basic sound of patches that utilize the sustain pedal (like some of the
+   built-in presets) are usually designed with the pedal being released, so
+   that's how they should sound when the plugin is used without one.
+
+v1.9.8 (2023-07-29)
+ * Bugfix: fixed logarithmic scale filter frequency persistency. When a
+   logarithmic scale filter frequency parameter had no controller assigned to
+   it, then patch save and load operations, and DAW project save and reopen
+   operations caused the filter frequency to significantly drift upwards.
+
+v1.9.7 (2023-07-22)
+ * Build separate versions of the plugin for newer CPUs which support the AVX
+   instruction set
+ * Bugfix: make sure that the FST plugin always reports the short name of the
+   current program correctly to the host application
+
+v1.9.6 (2023-07-16)
+ * Bugfix: when a note was immediately released after being triggered, it could
+   happen that its parameters that were controlled by envelopes would start
+   their release from the parameter's last set value instead of the envelope's
+   initial value. Now if a note is released immediately after getting triggered
+   then its parameters that have an envelope assigned to them will gradually
+   change from the envelope's initial value to its final value.
+ * Bugfix: the All Files option in file selector dialogs will actually show all
+   files on Linux, not just the ones with a dot in their name.
+
+v1.9.5 (2023-07-15)
+ * 2 new presets: Nightmare Lead and Tremolo Lead
+ * Bugfix: along with the release time, non-dynamic envelopes will also use the
+   final value and amount that was in effect at the moment when the note was
+   triggered, and only dynamic envelopes will update their final value and
+   amount for already sounding notes
+
+v1.9.4 (2023-07-14)
+ * Bugfix: when the same note was triggered on multiple voices while holding
+   down the sustain pedal, then releasing the pedal failed to release some
+   of the voices, keeping the note ringing. Now these stuck notes are correctly
+   released
+
 v1.9.3 (2023-07-11)
  * Documentation clarifications and typo fixes
  * Improve VST 3 bundle compatibility with 32 bit hosts on Linux

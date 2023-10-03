@@ -98,7 +98,11 @@ Sample const* const* Distortion<InputSignalProducerClass>::initialize_rendering(
 ) noexcept {
     Filter<InputSignalProducerClass>::initialize_rendering(round, sample_count);
 
-    level_buffer = FloatParam::produce_if_not_constant(level, round, sample_count);
+    level_buffer = FloatParamS::produce_if_not_constant(level, round, sample_count);
+
+    if (this->input.is_silent(round, sample_count)) {
+        return this->input_was_silent(round);
+    }
 
     if (level_buffer == NULL)
     {

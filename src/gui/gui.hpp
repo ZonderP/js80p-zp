@@ -62,7 +62,7 @@ class GUI
         enum ControllerCapability {
             NONE                = 0,
             MIDI_CONTROLLER     = 1 << 0,
-            FLEXIBLE_CONTROLLER = 1 << 1,
+            MACRO               = 1 << 1,
             LFO                 = 1 << 2,
             ENVELOPE            = 1 << 3,
             CHANNEL_PRESSURE    = 1 << 4,
@@ -92,7 +92,7 @@ class GUI
         static constexpr Frequency REFRESH_RATE = 18.0;
         static constexpr Seconds REFRESH_RATE_SECONDS = 1.0 / REFRESH_RATE;
 
-        static constexpr int CONTROLLERS_COUNT = 110;
+        static constexpr int CONTROLLERS_COUNT = 115;
 
         static char const* const MODES[];
         static int const MODES_COUNT;
@@ -102,6 +102,12 @@ class GUI
 
         static char const* const BIQUAD_FILTER_TYPES[];
         static int const BIQUAD_FILTER_TYPES_COUNT;
+
+        static char const* const CHORUS_TYPES[];
+        static int const CHORUS_TYPES_COUNT;
+
+        static char const* const REVERB_TYPES[];
+        static int const REVERB_TYPES_COUNT;
 
         static char const* const PARAMS[];
 
@@ -136,15 +142,15 @@ class GUI
         static Color const CTL_COLOR_MIDI_LEARN_BG;
         static Color const CTL_COLOR_AFTERTOUCH_TEXT;
         static Color const CTL_COLOR_AFTERTOUCH_BG;
-        static Color const CTL_COLOR_FLEX_TEXT;
-        static Color const CTL_COLOR_FLEX_BG;
+        static Color const CTL_COLOR_MACRO_TEXT;
+        static Color const CTL_COLOR_MACRO_BG;
         static Color const CTL_COLOR_LFO_TEXT;
         static Color const CTL_COLOR_LFO_BG;
         static Color const CTL_COLOR_ENVELOPE_TEXT;
         static Color const CTL_COLOR_ENVELOPE_BG;
 
         static void param_ratio_to_str(
-            Synth& synth,
+            Synth const& synth,
             Synth::ParamId const param_id,
             Number const ratio,
             Number const scale,
@@ -182,7 +188,7 @@ class GUI
         static void initialize_controllers_by_id();
 
         static void param_ratio_to_str_float(
-            Synth& synth,
+            Synth const& synth,
             Synth::ParamId const param_id,
             Number const ratio,
             Number const scale,
@@ -191,7 +197,7 @@ class GUI
             size_t const buffer_size
         );
         static void param_ratio_to_str_int(
-            Synth& synth,
+            Synth const& synth,
             Synth::ParamId const param_id,
             Number const ratio,
             char const* const* const options,

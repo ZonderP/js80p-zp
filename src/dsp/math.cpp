@@ -36,6 +36,7 @@ Math::Math() noexcept
     init_randoms();
     init_distortion();
     init_log_biquad_filter_freq();
+    init_linear_to_db();
 }
 
 
@@ -44,7 +45,9 @@ void Math::init_sines() noexcept
     constexpr Number scale = PI_DOUBLE / (Number)SIN_TABLE_SIZE;
 
     for (int i = 0; i != SIN_TABLE_SIZE; ++i) {
-        sines[i] = std::sin((Number)i * scale);
+        Number const x = (Number)i * scale;
+        sines[i] = std::sin(x);
+        cosines[i] = std::cos(x);
     }
 }
 
@@ -86,22 +89,64 @@ void Math::init_distortion() noexcept
 
 void Math::init_log_biquad_filter_freq() noexcept
 {
-    constexpr Number max_inv = 1.0 / (Number)LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX;
+    Number prev_idx = 0.0;
+    Number prev = Constants::BIQUAD_FILTER_FREQUENCY_MIN;
+
+    log_biquad_filter_freq[0] = prev;
+
+    for (int i = 1; i != LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX; ++i) {
+        Number const current_idx = (Number)i;
+        Number const ratio = current_idx * LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX_INV;
+        Number const current = ratio_to_exact_log_biquad_filter_frequency(ratio);
+
+        /*
+        The error of the piece-wise linear interpolation of this exponential
+        curve is positive on the whole domain. By slightly shifting the line
+        segments downward, parts of them go below the exact curve, introducing
+        negative errors which balance things out, reducing the overall,
+        integrated error.
+
+        The correction term is based on the error at the midpoint of the line
+        segment, ie. the difference between the linearly interpolated value and
+        the exact value. The constant scaler is picked so that the integrated
+        error is sufficiently close to 0.
+        */
+        Number const correction = -0.6683106 * (
+            (current + prev) * 0.5
+            - ratio_to_exact_log_biquad_filter_frequency(
+                (prev_idx + 0.5) * LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX_INV
+            )
+        );
+
+        log_biquad_filter_freq[i] = current + correction;
+        prev = current;
+        prev_idx = current_idx;
+    }
+
+    log_biquad_filter_freq[LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX] = (
+        Constants::BIQUAD_FILTER_FREQUENCY_MAX
+    );
+}
+
+
+Number Math::ratio_to_exact_log_biquad_filter_frequency(Number ratio) noexcept
+{
     constexpr Number min = Constants::BIQUAD_FILTER_FREQUENCY_MIN;
     constexpr Number max = Constants::BIQUAD_FILTER_FREQUENCY_MAX;
-    constexpr Number range = max - min;
-    constexpr Number log2_min = std::log2(min);
-    constexpr Number log2_max = std::log2(Constants::BIQUAD_FILTER_FREQUENCY_MAX);
-    constexpr Number log2_range = log2_max - log2_min;
-    constexpr Number log2_range_inv = 1.0 / log2_range;
+    constexpr Number range = max / min;
 
-    for (int i = 0; i != LOG_BIQUAD_FILTER_FREQ_TABLE_SIZE; ++i) {
-        Number const x = (Number)i * max_inv;
+    return min * std::pow(range, ratio);
+}
 
-        log_biquad_filter_freq_inv[i] = (
-            (std::log2(min + range * x) - log2_min) * log2_range_inv
-        );
-        log_biquad_filter_freq[i] = std::pow(2.0, log2_min + log2_range * x);
+
+void Math::init_linear_to_db() noexcept
+{
+    constexpr Number scale = LINEAR_TO_DB_MAX / (Number)LINEAR_TO_DB_TABLE_SIZE;
+
+    for (int i = 0; i != LINEAR_TO_DB_TABLE_SIZE; ++i) {
+        Number const x = LINEAR_TO_DB_MIN + scale * (Number)i;
+
+        linear_to_dbs[i] = LINEAR_TO_DB_GAIN_SCALE * std::log10(x);
     }
 }
 
@@ -114,18 +159,48 @@ Number Math::sin(Number const x) noexcept
 
 Number Math::cos(Number const x) noexcept
 {
-    return sin(x + PI_HALF);
+    return math.cos_impl(x);
 }
 
 
 Number Math::sin_impl(Number const x) const noexcept
+{
+    return math.trig(sines, x);
+}
+
+
+Number Math::cos_impl(Number const x) const noexcept
+{
+    return math.trig(cosines, x);
+}
+
+
+Number Math::trig(Number const* const table, Number const x) const noexcept
 {
     Number const index = x * SINE_SCALE;
     Number const after_weight = index - std::floor(index);
     int const before_index = ((int)index) & SIN_TABLE_MASK;
     int const after_index = (before_index + 1) & SIN_TABLE_MASK;
 
-    return combine(after_weight, sines[after_index], sines[before_index]);
+    return combine(after_weight, table[after_index], table[before_index]);
+}
+
+
+void Math::sincos(Number const x, Number& sin, Number& cos) noexcept
+{
+    math.sincos_impl(x, sin, cos);
+}
+
+
+void Math::sincos_impl(Number const x, Number& sin, Number& cos) const noexcept
+{
+    Number const index = x * SINE_SCALE;
+    Number const after_weight = index - std::floor(index);
+    int const before_index = ((int)index) & SIN_TABLE_MASK;
+    int const after_index = (before_index + 1) & SIN_TABLE_MASK;
+
+    sin = combine(after_weight, sines[after_index], sines[before_index]);
+    cos = combine(after_weight, cosines[after_index], cosines[before_index]);
 }
 
 
@@ -169,15 +244,30 @@ Number Math::pow_10_inv(Number const x) noexcept
 }
 
 
-Number const* Math::log_biquad_filter_freq_table() noexcept
+Number Math::db_to_linear(Number const db) noexcept
 {
-    return math.log_biquad_filter_freq;
+    return pow_10(db * DB_TO_LINEAR_GAIN_SCALE);
 }
 
 
-Number const* Math::log_biquad_filter_freq_inv_table() noexcept
+Number Math::linear_to_db(Number const linear) noexcept
 {
-    return math.log_biquad_filter_freq_inv;
+    /* LINEAR_TO_DB_MIN is considered to be approximately 0.0 */
+    return (
+        linear >= LINEAR_TO_DB_MIN
+            ? lookup(
+                math.linear_to_dbs,
+                LINEAR_TO_DB_TABLE_MAX_INDEX,
+                linear * LINEAR_TO_DB_SCALE
+            )
+            : DB_MIN
+    );
+}
+
+
+Number const* Math::log_biquad_filter_freq_table() noexcept
+{
+    return math.log_biquad_filter_freq;
 }
 
 
@@ -351,8 +441,9 @@ Number Math::lookup_periodic(
         int const table_size,
         Number const index
 ) noexcept {
-    Number const after_weight = index - std::floor(index);
-    int before_index = (int)std::floor(index);
+    Number const floor_index = std::floor(index);
+    Number const after_weight = index - floor_index;
+    int before_index = (int)floor_index;
 
     if (before_index < 0) {
         before_index -= (before_index / table_size - 1) * table_size;
@@ -368,10 +459,30 @@ Number Math::lookup_periodic(
         after_index = 0;
     }
 
+    return combine(after_weight, table[after_index], table[before_index]);
+}
+
+
+Number Math::lookup_periodic_2(
+        Number const* table,
+        int const table_size,
+        int const table_mask,
+        Number const index
+) noexcept {
+    Number const floor_index = std::floor(index);
+    Number const after_weight = index - floor_index;
+    int before_index = (int)floor_index;
+
+    if (before_index < 0) {
+        before_index -= (before_index / table_size - 1) * table_size;
+    }
+
+    int const after_index = before_index + 1;
+
     return combine(
         after_weight,
-        table[after_index],
-        table[before_index]
+        table[after_index & table_mask],
+        table[before_index & table_mask]
     );
 }
 

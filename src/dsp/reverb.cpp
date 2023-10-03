@@ -28,14 +28,28 @@ namespace JS80P
 {
 
 template<class InputSignalProducerClass>
-constexpr Seconds Reverb<InputSignalProducerClass>::TUNINGS[COMB_FILTERS];
+constexpr typename Reverb<InputSignalProducerClass>::Tuning Reverb<InputSignalProducerClass>::TUNINGS[][COMB_FILTERS];
+
+
+template<class InputSignalProducerClass>
+Reverb<InputSignalProducerClass>::TypeParam::TypeParam(
+        std::string const name
+) noexcept
+    : Param<Type, ParamEvaluation::BLOCK>(name, REVERB_1, REVERB_10, REVERB_1)
+{
+}
 
 
 template<class InputSignalProducerClass>
 Reverb<InputSignalProducerClass>::Reverb(
         std::string const name,
         InputSignalProducerClass& input
-) : Effect<InputSignalProducerClass>(name, input, 11 + COMB_FILTERS),
+) : SideChainCompressableEffect<InputSignalProducerClass>(
+        name,
+        input,
+        12 + COMB_FILTERS
+    ),
+    type(name+ "TYP"),
     room_size(name + "RS", 0.0, 0.999, 0.75),
     damping_frequency(
         name + "DF",
@@ -45,10 +59,8 @@ Reverb<InputSignalProducerClass>::Reverb(
         0.0,
         &log_scale_frequencies,
         Math::log_biquad_filter_freq_table(),
-        Math::log_biquad_filter_freq_inv_table(),
         Math::LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX,
-        Math::LOG_BIQUAD_FILTER_FREQ_SCALE,
-        Math::LOG_BIQUAD_FILTER_FREQ_INV_SCALE
+        Math::LOG_BIQUAD_FILTER_FREQ_SCALE
     ),
     damping_gain(name + "DG", -36.0, -0.01, -6.0),
     width(name + "WID", -1.0, 1.0, 0.0),
@@ -60,10 +72,8 @@ Reverb<InputSignalProducerClass>::Reverb(
         0.0,
         &log_scale_frequencies,
         Math::log_biquad_filter_freq_table(),
-        Math::log_biquad_filter_freq_inv_table(),
         Math::LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX,
-        Math::LOG_BIQUAD_FILTER_FREQ_SCALE,
-        Math::LOG_BIQUAD_FILTER_FREQ_INV_SCALE
+        Math::LOG_BIQUAD_FILTER_FREQ_SCALE
     ),
     log_scale_frequencies(name + "LOG", ToggleParam::OFF),
     mixer(input.get_channels()),
@@ -86,10 +96,114 @@ Reverb<InputSignalProducerClass>::Reverb(
         high_pass_frequency,
         high_pass_filter_q,
         high_pass_filter_gain
-    )
+    ),
+    comb_filters{
+        {
+            high_pass_filter,
+            PannedDelayStereoMode::NORMAL,
+            width,
+            room_size,
+            TUNINGS[0][0].delay_time,
+            DELAY_TIME_MAX,
+            damping_frequency,
+            damping_gain
+        },
+        {
+            high_pass_filter,
+            PannedDelayStereoMode::NORMAL,
+            width,
+            room_size,
+            TUNINGS[0][1].delay_time,
+            DELAY_TIME_MAX,
+            damping_frequency,
+            damping_gain
+        },
+        {
+            high_pass_filter,
+            PannedDelayStereoMode::NORMAL,
+            width,
+            room_size,
+            TUNINGS[0][2].delay_time,
+            DELAY_TIME_MAX,
+            damping_frequency,
+            damping_gain
+        },
+        {
+            high_pass_filter,
+            PannedDelayStereoMode::NORMAL,
+            width,
+            room_size,
+            TUNINGS[0][3].delay_time,
+            DELAY_TIME_MAX,
+            damping_frequency,
+            damping_gain
+        },
+        {
+            high_pass_filter,
+            PannedDelayStereoMode::NORMAL,
+            width,
+            room_size,
+            TUNINGS[0][4].delay_time,
+            DELAY_TIME_MAX,
+            damping_frequency,
+            damping_gain
+        },
+        {
+            high_pass_filter,
+            PannedDelayStereoMode::NORMAL,
+            width,
+            room_size,
+            TUNINGS[0][5].delay_time,
+            DELAY_TIME_MAX,
+            damping_frequency,
+            damping_gain
+        },
+        {
+            high_pass_filter,
+            PannedDelayStereoMode::NORMAL,
+            width,
+            room_size,
+            TUNINGS[0][6].delay_time,
+            DELAY_TIME_MAX,
+            damping_frequency,
+            damping_gain
+        },
+        {
+            high_pass_filter,
+            PannedDelayStereoMode::NORMAL,
+            width,
+            room_size,
+            TUNINGS[0][7].delay_time,
+            DELAY_TIME_MAX,
+            damping_frequency,
+            damping_gain
+        },
+        {
+            high_pass_filter,
+            PannedDelayStereoMode::NORMAL,
+            width,
+            room_size,
+            TUNINGS[0][8].delay_time,
+            DELAY_TIME_MAX,
+            damping_frequency,
+            damping_gain
+        },
+        {
+            high_pass_filter,
+            PannedDelayStereoMode::NORMAL,
+            width,
+            room_size,
+            TUNINGS[0][9].delay_time,
+            DELAY_TIME_MAX,
+            damping_frequency,
+            damping_gain
+        },
+    },
+    previous_type(255)
 {
     this->register_child(mixer);
 
+    this->register_child(type);
     this->register_child(room_size);
     this->register_child(damping_frequency);
     this->register_child(damping_gain);
@@ -103,22 +217,16 @@ Reverb<InputSignalProducerClass>::Reverb(
 
     this->register_child(high_pass_filter);
 
-    for (Integer i = 0; i != COMB_FILTERS; ++i) {
-        comb_filters[i] = new CombFilter(
-            high_pass_filter,
-            i & 1 ? PannedDelayStereoMode::FLIPPED : PannedDelayStereoMode::NORMAL,
-            width,
-            room_size,
-            TUNINGS[i],
-            damping_frequency,
-            damping_gain
+    for (size_t i = 0; i != COMB_FILTERS; ++i) {
+        comb_filters[i].delay.set_feedback_signal_producer(
+            &comb_filters[i].high_shelf_filter
         );
-        comb_filters[i]->delay.set_feedback_signal_producer(
-            &comb_filters[i]->high_shelf_filter
+        comb_filters[i].high_shelf_filter.set_shared_cache(
+            &high_shelf_filter_shared_cache
         );
 
-        mixer.add(*comb_filters[i]);
-        this->register_child(*comb_filters[i]);
+        mixer.add(comb_filters[i]);
+        this->register_child(comb_filters[i]);
     }
 
     high_pass_filter_type.set_value(HighPassedInput::HIGH_PASS);
@@ -126,12 +234,11 @@ Reverb<InputSignalProducerClass>::Reverb(
 
 
 template<class InputSignalProducerClass>
-Reverb<InputSignalProducerClass>::~Reverb()
+void Reverb<InputSignalProducerClass>::reset() noexcept
 {
-    for (Integer i = 0; i != COMB_FILTERS; ++i) {
-        delete comb_filters[i];
-        comb_filters[i] = NULL;
-    }
+    SideChainCompressableEffect<InputSignalProducerClass>::reset();
+
+    previous_type = 255;
 }
 
 
@@ -141,17 +248,47 @@ Sample const* const* Reverb<InputSignalProducerClass>::initialize_rendering(
         Integer const sample_count
 ) noexcept {
     Sample const* const* const buffer = (
-        Effect<InputSignalProducerClass>::initialize_rendering(round, sample_count)
+        SideChainCompressableEffect<InputSignalProducerClass>::initialize_rendering(
+            round, sample_count
+        )
     );
 
     if (buffer != NULL) {
         return buffer;
     }
 
+    Byte const type = this->type.get_value();
+
+    if (previous_type != type) {
+        previous_type = type;
+
+        update_tunings(type);
+    }
+
     mixer.set_output_buffer(this->buffer);
     SignalProducer::produce< Mixer<CombFilter> >(mixer, round, sample_count);
 
     return NULL;
+}
+
+
+template<class InputSignalProducerClass>
+void Reverb<InputSignalProducerClass>::update_tunings(Byte const type) noexcept
+{
+    Tuning const* const tunings = TUNINGS[type];
+
+    mixer.reset();
+
+    for (size_t i = 0; i != COMB_FILTERS; ++i) {
+        Tuning const& tuning = tunings[i];
+        CombFilter& comb_filter = comb_filters[i];
+
+        comb_filter.reset();
+        comb_filter.delay.time.set_value(tuning.delay_time);
+        comb_filter.set_panning_scale(tuning.panning_scale);
+
+        mixer.set_weight(i, tuning.weight);
+    }
 }
 
 }

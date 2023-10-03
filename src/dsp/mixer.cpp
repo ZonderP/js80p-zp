@@ -19,6 +19,8 @@
 #ifndef JS80P__DSP__MIXER_CPP
 #define JS80P__DSP__MIXER_CPP
 
+#include <cmath>
+
 #include "dsp/mixer.hpp"
 
 
@@ -41,6 +43,17 @@ void Mixer<InputSignalProducerClass>::add(InputSignalProducerClass& input) noexc
 
 
 template<class InputSignalProducerClass>
+void Mixer<InputSignalProducerClass>::set_weight(
+        size_t const input_index,
+        Number const weight
+) noexcept {
+    if (input_index < inputs.size()) {
+        inputs[input_index].weight = weight;
+    }
+}
+
+
+template<class InputSignalProducerClass>
 void Mixer<InputSignalProducerClass>::set_output_buffer(Sample** output) noexcept
 {
     this->output = output;
@@ -52,8 +65,17 @@ Sample const* const* Mixer<InputSignalProducerClass>::initialize_rendering(
     Integer const round,
     Integer const sample_count
 ) noexcept {
+    has_weights = false;
+
     for (typename std::vector<Input>::iterator it = inputs.begin(); it != inputs.end(); ++it) {
-        it->buffer = SignalProducer::produce<InputSignalProducerClass>(*it->input, round, sample_count);
+        Number const weight = it->weight;
+
+        if (weight > SILENCE_WEIGHT) {
+            it->buffer = SignalProducer::produce<InputSignalProducerClass>(
+                *it->input, round, sample_count
+            );
+            has_weights = has_weights || std::fabs(weight - 1.0) >= 0.000001;
+        }
     }
 
     return NULL;
@@ -67,15 +89,39 @@ void Mixer<InputSignalProducerClass>::render(
         Integer const last_sample_index,
         Sample** buffer
 ) noexcept {
+    if (has_weights) {
+        render<true>(round, first_sample_index, last_sample_index, buffer);
+    } else {
+        render<false>(round, first_sample_index, last_sample_index, buffer);
+    }
+}
+
+
+template<class InputSignalProducerClass>
+template<bool has_weights>
+void Mixer<InputSignalProducerClass>::render(
+        Integer const round,
+        Integer const first_sample_index,
+        Integer const last_sample_index,
+        Sample** buffer
+) noexcept {
     Integer const channels = get_channels();
     Sample** output = this->output != NULL ? this->output : buffer;
 
     render_silence(round, first_sample_index, last_sample_index, output);
 
     for (typename std::vector<Input>::iterator it = inputs.begin(); it != inputs.end(); ++it) {
+        if (UNLIKELY(it->weight < SILENCE_WEIGHT)) {
+            continue;
+        }
+
         for (Integer c = 0; c != channels; ++c) {
             for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-                output[c][i] += it->buffer[c][i];
+                if constexpr (has_weights) {
+                    output[c][i] += it->weight * it->buffer[c][i];
+                } else {
+                    output[c][i] += it->buffer[c][i];
+                }
             }
         }
     }
@@ -85,50 +131,11 @@ void Mixer<InputSignalProducerClass>::render(
 template<class InputSignalProducerClass>
 Mixer<InputSignalProducerClass>::Input::Input(InputSignalProducerClass* input)
     : input(input),
-    buffer(NULL)
+    buffer(NULL),
+    weight(1.0)
 {
 }
 
-
-template<class InputSignalProducerClass>
-Mixer<InputSignalProducerClass>::Input::Input(Input const& input)
-    : input(input.input),
-    buffer(input.buffer)
-{
-}
-
-
-template<class InputSignalProducerClass>
-Mixer<InputSignalProducerClass>::Input::Input(Input const&& input)
-    : input(input.input),
-    buffer(input.buffer)
-{
-}
-
-template<class InputSignalProducerClass>
-typename Mixer<InputSignalProducerClass>::Input& Mixer<InputSignalProducerClass>::Input::operator=(
-        Input const& input
-) {
-    if (this != &input) {
-        this->input = input.input;
-        this->buffer = input.buffer;
-    }
-
-    return *this;
-}
-
-
-template<class InputSignalProducerClass>
-typename Mixer<InputSignalProducerClass>::Input& Mixer<InputSignalProducerClass>::Input::operator=(
-        Input const&& input
-) {
-    if (this != &input) {
-        this->input = input.input;
-        this->buffer = input.buffer;
-    }
-
-    return *this;
-}
 
 }
 

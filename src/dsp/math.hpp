@@ -71,16 +71,26 @@ class Math
             std::max(LN_OF_10 * POW_10_MAX, -1.0 * LN_OF_10 * POW_10_INV_MIN)
         ); ///< \warning This limit is not enforced. Values outside the limit may be imprecise.
 
-        static constexpr int LOG_BIQUAD_FILTER_FREQ_TABLE_SIZE = 0x0800;
+        static constexpr int SIN_TABLE_SIZE = 0x1000;
+        static constexpr int SIN_TABLE_MASK = SIN_TABLE_SIZE - 1;
+
+        static constexpr int LOG_BIQUAD_FILTER_FREQ_TABLE_SIZE = 0x1000;
+
         static constexpr int LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX = (
             LOG_BIQUAD_FILTER_FREQ_TABLE_SIZE - 1
         );
+
+        static constexpr Number LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX_INV = (
+            1.0 / (Number)LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX
+        );
+
         static constexpr Number LOG_BIQUAD_FILTER_FREQ_SCALE = (
-            (Number)LOG_BIQUAD_FILTER_FREQ_TABLE_SIZE
+            (Number)LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX
         );
-        static constexpr Number LOG_BIQUAD_FILTER_FREQ_INV_SCALE = (
-            1.0 / (Constants::BIQUAD_FILTER_FREQUENCY_MAX - Constants::BIQUAD_FILTER_FREQUENCY_MIN)
-        );
+
+        static constexpr Number DB_MIN = -120.0;
+        static constexpr Number LINEAR_TO_DB_MIN = 0.000001;
+        static constexpr Number LINEAR_TO_DB_MAX = 5.0;
 
         /**
          * \warning Negative numbers close to multiples of PI are not handled
@@ -94,12 +104,27 @@ class Math
          */
         static Number cos(Number const x) noexcept;
 
+        /**
+         * \warning Negative numbers close to multiples of PI are not handled
+         *          very well with regards to precision.
+         */
+        static void sincos(Number const x, Number& sin, Number& cos) noexcept;
+
         static Number exp(Number const x) noexcept;
         static Number pow_10(Number const x) noexcept;
         static Number pow_10_inv(Number const x) noexcept;
 
+        static Number db_to_linear(Number const db) noexcept;
+        static Number linear_to_db(Number const linear) noexcept;
+
         static Number const* log_biquad_filter_freq_table() noexcept;
-        static Number const* log_biquad_filter_freq_inv_table() noexcept;
+
+        /**
+         * \brief Calcualte the exact biquad filter frequency value using a
+         *        logarithmic scale for a given ratio between 0.0 and 1.0.
+         *        Intended for testing purposes.
+         */
+        static Number ratio_to_exact_log_biquad_filter_frequency(Number ratio) noexcept;
 
         static Frequency detune(
             Frequency const frequency,
@@ -165,6 +190,17 @@ class Math
             Number const index
         ) noexcept;
 
+        /**
+         * \brief Same as \c lookup_periodic() but for tables that have a size
+         *        that is a power of 2.
+         */
+        static Number lookup_periodic_2(
+            Number const* table,
+            int const table_size,
+            int const table_mask,
+            Number const index
+        ) noexcept;
+
         class Statistics;
 
         static void compute_statistics(
@@ -191,9 +227,6 @@ class Math
         static constexpr int DISTORTION_TABLE_MAX_INDEX = DISTORTION_TABLE_SIZE - 1;
         static constexpr Number DISTORTION_SCALE = (Number)DISTORTION_TABLE_SIZE;
 
-        static constexpr int SIN_TABLE_SIZE = 0x1000;
-        static constexpr int SIN_TABLE_MASK = SIN_TABLE_SIZE - 1;
-
         static constexpr Number SINE_SCALE = (Number)SIN_TABLE_SIZE / PI_DOUBLE;
 
         static constexpr int EXP_ITERATIONS = 8;
@@ -203,6 +236,16 @@ class Math
         static constexpr Number POW_10_INV_SCALE = -1.0 * POW_10_SCALE;
 
         static constexpr Number DETUNE_CENTS_TO_POWER_OF_2_SCALE = 1.0 / 1200.0;
+
+        static constexpr int LINEAR_TO_DB_TABLE_SIZE = 0x0800;
+        static constexpr int LINEAR_TO_DB_TABLE_MAX_INDEX = LINEAR_TO_DB_TABLE_SIZE - 1;
+        static constexpr Number LINEAR_TO_DB_GAIN_SCALE = 20.0;
+        static constexpr Number DB_TO_LINEAR_GAIN_SCALE = 1.0 / LINEAR_TO_DB_GAIN_SCALE;
+
+        /* LINEAR_TO_DB_MIN is considered to be approximately 0.0 */
+        static constexpr Number LINEAR_TO_DB_SCALE = (
+            (Number)LINEAR_TO_DB_TABLE_SIZE / LINEAR_TO_DB_MAX
+        );
 
         static Math const math;
 
@@ -214,16 +257,21 @@ class Math
         void init_randoms() noexcept;
         void init_distortion() noexcept;
         void init_log_biquad_filter_freq() noexcept;
+        void init_linear_to_db() noexcept;
 
         Number sin_impl(Number const x) const noexcept;
+        Number cos_impl(Number const x) const noexcept;
+        Number trig(Number const* const table, Number const x) const noexcept;
+        void sincos_impl(Number const x, Number& sin, Number& cos) const noexcept;
 
         Number sines[SIN_TABLE_SIZE];
+        Number cosines[SIN_TABLE_SIZE];
         Number randoms[RANDOMS];
         Number randoms_centered_lfo[RANDOMS];
         Number distortion[DISTORTION_TABLE_SIZE];
         Number distortion_centered_lfo[DISTORTION_TABLE_SIZE];
         Number log_biquad_filter_freq[LOG_BIQUAD_FILTER_FREQ_TABLE_SIZE];
-        Number log_biquad_filter_freq_inv[LOG_BIQUAD_FILTER_FREQ_TABLE_SIZE];
+        Number linear_to_dbs[LINEAR_TO_DB_TABLE_SIZE];
 };
 
 }

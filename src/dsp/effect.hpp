@@ -43,8 +43,8 @@ class Effect : public Filter<InputSignalProducerClass>
             Integer const number_of_children = 0
         );
 
-        FloatParam dry;
-        FloatParam wet;
+        FloatParamS dry;
+        FloatParamS wet;
 
     protected:
         Sample const* const* initialize_rendering(
@@ -59,7 +59,6 @@ class Effect : public Filter<InputSignalProducerClass>
             Sample** buffer
         ) noexcept;
 
-    private:
         Sample const* wet_buffer;
         Sample const* dry_buffer;
         bool is_dry;

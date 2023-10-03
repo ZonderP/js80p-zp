@@ -22,8 +22,8 @@
 #include "js80p.hpp"
 
 #include "dsp/envelope.cpp"
-#include "dsp/flexible_controller.cpp"
 #include "dsp/lfo.cpp"
+#include "dsp/macro.cpp"
 #include "dsp/math.cpp"
 #include "dsp/midi_controller.cpp"
 #include "dsp/oscillator.cpp"
@@ -203,7 +203,7 @@ TEST(when_a_midi_controller_is_assigned_to_a_param_then_the_params_value_follows
 
     assert_eq((void*)&midi_controller, (void*)param.get_midi_controller());
     assert_eq(2, param.get_value());
-    assert_eq(0.6, param.get_ratio());
+    assert_eq(0.6, param.get_ratio(), DOUBLE_DELTA);
 
     rendered_samples = SignalProducer::produce< Param<int> >(param, 1, block_size);
 
@@ -214,25 +214,91 @@ TEST(when_a_midi_controller_is_assigned_to_a_param_then_the_params_value_follows
     change_index_2 = param.get_change_index();
 
     assert_eq(-5, param.get_value());
-    assert_eq(0.2514, param.get_ratio());
+    assert_eq(0.2514, param.get_ratio(), DOUBLE_DELTA);
 
     assert_neq((int)change_index_1, (int)change_index_2);
 
     midi_controller.change(0.0, 0.35);
     param.set_midi_controller(NULL);
+
     assert_eq(-3, param.get_value());
 })
 
 
+TEST(when_a_macro_is_assigned_to_a_param_then_the_params_value_follows_the_changes_of_the_macro, {
+    constexpr Integer block_size = 5;
+    constexpr Sample expected_samples[] = {
+        2, 2, 2, 2, 2,
+    };
+    Param<int> param("int", -10, 10, 0);
+    Macro macro;
+    Sample const* const* rendered_samples;
+    Integer change_index_1;
+    Integer change_index_2;
+
+    macro.input.set_value(0.6);
+
+    param.set_block_size(block_size);
+    param.set_sample_rate(1.0);
+    param.set_macro(&macro);
+
+    assert_eq((void*)&macro, (void*)param.get_macro());
+    assert_eq(2, param.get_value());
+    assert_eq(0.6, param.get_ratio(), DOUBLE_DELTA);
+
+    rendered_samples = SignalProducer::produce< Param<int> >(param, 1, block_size);
+
+    assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
+
+    change_index_1 = param.get_change_index();
+    macro.input.set_value(0.2514);
+    change_index_2 = param.get_change_index();
+
+    assert_eq(-5, param.get_value());
+    assert_eq(0.2514, param.get_ratio(), DOUBLE_DELTA);
+
+    assert_neq((int)change_index_1, (int)change_index_2);
+
+    macro.input.set_value(0.35);
+    param.set_midi_controller(NULL);
+    assert_eq(-3, param.get_value());
+})
+
+
+TEST(when_param_is_evaluated_once_per_rendering_block_then_no_buffer_is_allocated, {
+    Param<Number, ParamEvaluation::BLOCK> block_evaluated_param("BEP", 0.0, 1.0, 0.5);
+    ToggleParam toggle_param("T", ToggleParam::OFF);
+    FloatParamB block_evaluated_float_param("BEFP", 0.0, 1.0, 0.5);
+    FloatParamB float_param("F", 0.0, 1.0, 0.5);
+    FloatParamB follower(float_param);
+
+    assert_eq(
+        NULL,
+        SignalProducer::produce< Param<Number, ParamEvaluation::BLOCK> >(
+            block_evaluated_param, 1, 1
+        )
+    );
+    assert_eq(
+        NULL,
+        FloatParamB::produce<FloatParamB>(block_evaluated_float_param, 1, 1)
+    );
+    assert_eq(NULL, SignalProducer::produce<ToggleParam>(toggle_param, 1, 1));
+
+    assert_eq((int)ParamEvaluation::BLOCK, (int)block_evaluated_param.get_evaluation());
+    assert_eq((int)ParamEvaluation::BLOCK, (int)toggle_param.get_evaluation());
+    assert_eq((int)ParamEvaluation::BLOCK, (int)follower.get_evaluation());
+})
+
+
 void assert_float_param_does_not_change_during_rendering(
-        FloatParam& float_param,
+        FloatParamS& float_param,
         Integer const round,
         Integer const chunk_size,
         Sample const** rendered_samples
 ) {
     Integer const change_index_before = float_param.get_change_index();
     *rendered_samples = (
-        FloatParam::produce<FloatParam>(float_param, round, chunk_size)[0]
+        FloatParamS::produce<FloatParamS>(float_param, round, chunk_size)[0]
     );
     Integer const change_index_after = float_param.get_change_index();
 
@@ -241,14 +307,14 @@ void assert_float_param_does_not_change_during_rendering(
 
 
 void assert_float_param_changes_during_rendering(
-        FloatParam& float_param,
+        FloatParamS& float_param,
         Integer const round,
         Integer const chunk_size,
         Sample const** rendered_samples
 ) {
     Integer const change_index_before = float_param.get_change_index();
     *rendered_samples = (
-        FloatParam::produce<FloatParam>(float_param, round, chunk_size)[0]
+        FloatParamS::produce<FloatParamS>(float_param, round, chunk_size)[0]
     );
     Integer const change_index_after = float_param.get_change_index();
 
@@ -260,7 +326,7 @@ TEST(float_param_can_schedule_and_clamp_values, {
     constexpr Integer block_size = 5;
     Sample const* rendered_samples;
     constexpr Sample expected_samples[] = {0.5, 0.5, 1.0, 1.0, 1.0};
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
 
     float_param.set_block_size(block_size);
     float_param.set_sample_rate(1.0);
@@ -286,7 +352,7 @@ TEST(float_param_can_tell_if_it_is_constant_through_the_next_round, {
         {0.5, 0.5, 1.0},
         {1.0, 1.0, 1.0},
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* rendered_samples;
 
     float_param.set_block_size(block_size);
@@ -320,7 +386,7 @@ TEST(float_param_can_tell_if_it_is_constant_through_the_next_round, {
 TEST(float_param_can_schedule_and_clamp_values_between_samples, {
     constexpr Integer block_size = 5;
     constexpr Sample expected_samples[] = {0.5, 0.5, 0.5, 1.0, 1.0};
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* const* rendered_samples;
 
     float_param.set_sample_rate(3.0);
@@ -331,7 +397,7 @@ TEST(float_param_can_schedule_and_clamp_values_between_samples, {
     assert_true(float_param.is_constant_until(3));
     assert_false(float_param.is_constant_until(4));
 
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
 
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
@@ -340,13 +406,13 @@ TEST(float_param_can_schedule_and_clamp_values_between_samples, {
 TEST(float_param_can_cancel_scheduled_value, {
     constexpr Integer block_size = 5;
     constexpr Sample expected_samples[] = {0.5, 0.5, 0.5, 0.5, 0.5};
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* rendered_samples;
 
     float_param.set_sample_rate(1.0);
     float_param.set_value(0.5);
     float_param.schedule_value(2.0, 1.1);
-    float_param.cancel_events(1.0);
+    float_param.cancel_events_at(1.0);
 
     assert_float_param_does_not_change_during_rendering(
         float_param, 1, block_size, &rendered_samples
@@ -358,13 +424,13 @@ TEST(float_param_can_cancel_scheduled_value, {
 TEST(float_param_can_cancel_scheduled_value_between_samples, {
     constexpr Integer block_size = 5;
     constexpr Sample expected_samples[] = {0.5, 0.5, 0.5, 0.5, 0.5};
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* rendered_samples;
 
     float_param.set_sample_rate(2.0);
     float_param.set_value(0.5);
     float_param.schedule_value(1.0, 1.1);
-    float_param.cancel_events(0.9);
+    float_param.cancel_events_at(0.9);
 
     assert_float_param_does_not_change_during_rendering(
         float_param, 1, block_size, &rendered_samples
@@ -376,7 +442,7 @@ TEST(float_param_can_cancel_scheduled_value_between_samples, {
 TEST(float_param_can_round_set_and_scheduled_values, {
     constexpr Integer block_size = 5;
     constexpr Sample expected_samples[] = {10.0, 10.0, 10.0, 20.0, 20.0};
-    FloatParam float_param("float", 0.0, 100.0, 0.0, 10.0);
+    FloatParamS float_param("float", 0.0, 100.0, 0.0, 10.0);
     Sample const* const* rendered_samples;
 
     float_param.set_sample_rate(3.0);
@@ -389,7 +455,7 @@ TEST(float_param_can_round_set_and_scheduled_values, {
     assert_eq(10.0, float_param.get_value(), DOUBLE_DELTA);
 
     float_param.schedule_value(0.9, 19.0);
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
 
@@ -402,7 +468,7 @@ TEST(float_param_can_schedule_linear_ramping_clamped_to_max_value, {
         0.6, 0.7, 0.8, 0.9, 1.0,
         1.0, 1.0, 1.0, 1.0, 1.0,
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* rendered_samples;
 
     float_param.set_sample_rate(1.0);
@@ -427,7 +493,7 @@ TEST(float_param_can_schedule_linear_ramping_clamped_to_min_value, {
         -0.6, -0.7, -0.8, -0.9, -1.0,
         -1.0, -1.0, -1.0, -1.0, -1.0,
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* rendered_samples;
 
     float_param.set_sample_rate(1.0);
@@ -450,14 +516,14 @@ TEST(when_float_param_linear_ramping_is_canceled_then_last_calculated_value_is_h
         0.5, 0.5, 0.5, 0.5, 0.5,
         0.5, 0.5, 0.5, 0.5, 0.5,
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* rendered_samples;
 
     float_param.set_sample_rate(1.0);
     float_param.set_value(-0.1);
     float_param.schedule_value(5.0, 0.0);
     float_param.schedule_linear_ramp(15.0, 1.5);
-    float_param.cancel_events(10.0);
+    float_param.cancel_events_at(10.0);
 
     assert_float_param_changes_during_rendering(
         float_param, 1, block_size, &rendered_samples
@@ -469,7 +535,7 @@ TEST(when_float_param_linear_ramping_is_canceled_then_last_calculated_value_is_h
 TEST(resetting_cancels_a_linear_ramping, {
     constexpr Integer block_size = 5;
     constexpr Sample expected_samples[] = {0.3, 0.3, 0.3, 0.3, 0.3};
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* rendered_samples;
 
     float_param.set_sample_rate(1.0);
@@ -478,9 +544,9 @@ TEST(resetting_cancels_a_linear_ramping, {
     float_param.schedule_value(2.0, 0.0);
     float_param.schedule_linear_ramp(10.0, 1.0);
 
-    FloatParam::produce<FloatParam>(float_param, 1);
+    FloatParamS::produce<FloatParamS>(float_param, 1);
     float_param.reset();
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 2)[0];
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 2)[0];
 
     assert_eq(expected_samples, rendered_samples, block_size, DOUBLE_DELTA);
 })
@@ -501,7 +567,7 @@ TEST(float_param_linear_ramps_may_stretch_over_several_rendering_rounds, {
     };
     Integer next_sample_index = 0;
     Buffer rendered(sample_count);
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
 
     float_param.set_sample_rate(1.0);
     float_param.set_value(-0.1);
@@ -515,7 +581,7 @@ TEST(float_param_linear_ramps_may_stretch_over_several_rendering_rounds, {
             "round=%lld", (long long int)round
         );
 
-        Sample const* const* const block = FloatParam::produce<FloatParam>(
+        Sample const* const* const block = FloatParamS::produce<FloatParamS>(
             float_param, round, block_size
         );
 
@@ -524,7 +590,7 @@ TEST(float_param_linear_ramps_may_stretch_over_several_rendering_rounds, {
         }
 
         if (round == 1) {
-            float_param.cancel_events(3.0);
+            float_param.cancel_events_at(3.0);
         }
     }
 
@@ -538,15 +604,15 @@ TEST(when_float_param_linear_ramp_is_canceled_between_samples_then_in_between_sa
         -0.1, -0.5, 0.5, 0.75, 0.75,
         0.75, 0.75, 0.75, 0.75, 0.75,
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* const* rendered_samples;
 
     float_param.set_sample_rate(1.0);
     float_param.set_value(-0.1);
     float_param.schedule_value(0.5, -1.0);
     float_param.schedule_linear_ramp(2.0, 1.0);
-    float_param.cancel_events(2.25);
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    float_param.cancel_events_at(2.25);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
 
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
@@ -558,15 +624,15 @@ TEST(when_float_param_linear_ramp_is_canceled_between_samples_then_in_between_sa
         -0.1, -0.5, 0.5, 1.0, 1.0,
         1.0, 1.0, 1.0, 1.0, 1.0,
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* const* rendered_samples;
 
     float_param.set_sample_rate(1.0);
     float_param.set_value(-0.1);
     float_param.schedule_value(0.5, -1.0);
     float_param.schedule_linear_ramp(10.0, 9.0);
-    float_param.cancel_events(2.75);
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    float_param.cancel_events_at(2.75);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
 
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
@@ -575,7 +641,7 @@ TEST(when_float_param_linear_ramp_is_canceled_between_samples_then_in_between_sa
 TEST(float_param_zero_length_linear_ramp_is_equivalent_to_setting_value, {
     constexpr Integer block_size = 5;
     constexpr Sample expected_samples[block_size] = {-1.0, -1.0, 1.0, 1.0, 1.0};
-    FloatParam float_param("float", -1.0, 1.0, -1.0);
+    FloatParamS float_param("float", -1.0, 1.0, -1.0);
     Sample const* const* rendered_samples;
 
     float_param.set_sample_rate(1.0);
@@ -583,7 +649,7 @@ TEST(float_param_zero_length_linear_ramp_is_equivalent_to_setting_value, {
     float_param.schedule_value(2.0, 0.0);
     float_param.schedule_linear_ramp(0.0, 1.0);
 
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
 
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
@@ -592,7 +658,7 @@ TEST(float_param_zero_length_linear_ramp_is_equivalent_to_setting_value, {
 TEST(float_param_negative_length_linear_ramp_is_equivalent_to_setting_value, {
     constexpr Integer block_size = 5;
     constexpr Sample expected_samples[block_size] = {-1.0, -1.0, 1.0, 1.0, 1.0};
-    FloatParam float_param("float", -1.0, 1.0, -1.0);
+    FloatParamS float_param("float", -1.0, 1.0, -1.0);
     Sample const* const* rendered_samples;
 
     float_param.set_sample_rate(1.0);
@@ -600,7 +666,7 @@ TEST(float_param_negative_length_linear_ramp_is_equivalent_to_setting_value, {
     float_param.schedule_value(2.0, 0.0);
     float_param.schedule_linear_ramp(-1.0, 1.0);
 
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
 
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
@@ -608,8 +674,8 @@ TEST(float_param_negative_length_linear_ramp_is_equivalent_to_setting_value, {
 
 TEST(float_param_rendering_is_independent_of_chunk_size, {
     constexpr Frequency sample_rate = 22050.0;
-    FloatParam param_1("", -1.0, 1.0, 0.0);
-    FloatParam param_2("", -1.0, 1.0, 0.0);
+    FloatParamS param_1("", -1.0, 1.0, 0.0);
+    FloatParamS param_2("", -1.0, 1.0, 0.0);
 
     param_1.set_sample_rate(sample_rate);
     param_2.set_sample_rate(sample_rate);
@@ -620,7 +686,7 @@ TEST(float_param_rendering_is_independent_of_chunk_size, {
     param_1.schedule_linear_ramp(1.0, 0.2);
     param_2.schedule_linear_ramp(1.0, 0.2);
 
-    assert_rendering_is_independent_from_chunk_size<FloatParam>(param_1, param_2);
+    assert_rendering_is_independent_from_chunk_size<FloatParamS>(param_1, param_2);
 })
 
 
@@ -631,7 +697,7 @@ TEST(float_param_linear_ramps_may_follow_each_other, {
         0.2, 0.4, 0.6, 0.8, 1.0,
         1.0, 1.0, 1.0, 1.0, 1.0,
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* const* rendered_samples;
 
     float_param.set_sample_rate(10.0);
@@ -640,7 +706,7 @@ TEST(float_param_linear_ramps_may_follow_each_other, {
     float_param.schedule_linear_ramp(0.2, 0.0);
     float_param.schedule_linear_ramp(0.5, 1.0);
 
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
 
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
@@ -652,14 +718,14 @@ TEST(float_param_linear_ramp_may_start_and_end_between_samples, {
         -0.1, -0.1, 0.25, 0.75, 1.0,
         1.0, 1.0, 1.0, 1.0, 1.0,
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* const* rendered_samples;
 
     float_param.set_sample_rate(2.0);
     float_param.set_value(-0.1);
     float_param.schedule_value(0.75, 0.0);
     float_param.schedule_linear_ramp(1.5, 1.5);
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
 
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
@@ -671,14 +737,14 @@ TEST(when_float_param_linear_ramp_goes_out_of_bounds_between_samples_then_it_is_
         0.0, 0.0, 0.0, 0.0, 0.0,
         1.0, 1.0, 1.0, 1.0, 1.0,
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* const* rendered_samples;
 
     float_param.set_sample_rate(5.0);
     float_param.set_value(0.0);
     float_param.schedule_value(0.99, 1.0);
     float_param.schedule_linear_ramp(0.02, 99999.0);
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
 
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
@@ -690,7 +756,7 @@ TEST(a_float_params_clock_can_be_advanced_without_rendering, {
         -1.0, 0.125, 0.375, 0.625, 0.875,
         1.0, 1.0, 1.0, 1.0, 1.0,
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* const* rendered_samples;
 
     float_param.set_block_size(block_size);
@@ -702,7 +768,7 @@ TEST(a_float_params_clock_can_be_advanced_without_rendering, {
     float_param.skip_round(0, block_size);
     float_param.skip_round(1, block_size);
     float_param.skip_round(2, block_size);
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 3, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 3, block_size);
 
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
@@ -714,7 +780,7 @@ TEST(skipping_the_same_round_multiple_times_advances_the_clock_only_once, {
         -1.0, 0.125, 0.375, 0.625, 0.875,
         1.0, 1.0, 1.0, 1.0, 1.0,
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* const* rendered_samples;
 
     float_param.set_block_size(block_size);
@@ -728,7 +794,7 @@ TEST(skipping_the_same_round_multiple_times_advances_the_clock_only_once, {
     float_param.skip_round(1, block_size);
     float_param.skip_round(1, block_size);
     float_param.skip_round(2, block_size);
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 3, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 3, block_size);
 
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
@@ -741,7 +807,7 @@ TEST(a_skipped_round_may_be_shorter_than_the_block_size, {
         -1.0, -1.0, -1.0, -1.0, -1.0,
         -1.0, -1.0, 0.125,
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* const* rendered_samples;
 
     float_param.set_block_size(block_size);
@@ -755,7 +821,7 @@ TEST(a_skipped_round_may_be_shorter_than_the_block_size, {
     float_param.skip_round(1, short_round_length);
     float_param.skip_round(1, short_round_length);
     float_param.skip_round(2, short_round_length);
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 3, short_round_length);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 3, short_round_length);
 
     assert_eq(expected_samples, rendered_samples[0], short_round_length, DOUBLE_DELTA);
 })
@@ -770,7 +836,7 @@ TEST(float_param_can_automatically_skip_constant_rounds, {
         0.875, 1.0,
         /* 1.0, 1.0, 1.0, 1.0, 1.0, */
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* first_round;
     Sample const* second_round_1;
     Sample const* second_round_2;
@@ -783,19 +849,19 @@ TEST(float_param_can_automatically_skip_constant_rounds, {
     float_param.schedule_value(6.25, 0.0);
     float_param.schedule_linear_ramp(2.0, 1.0);
 
-    first_round = FloatParam::produce_if_not_constant(
+    first_round = FloatParamS::produce_if_not_constant(
         float_param, 0, short_round_length
     );
-    second_round_1 = FloatParam::produce_if_not_constant(
+    second_round_1 = FloatParamS::produce_if_not_constant(
         float_param, 1, short_round_length
     );
-    second_round_2 = FloatParam::produce_if_not_constant<FloatParam>(
+    second_round_2 = FloatParamS::produce_if_not_constant<FloatParamS>(
         float_param, 1, short_round_length
     );
-    third_round_1 = FloatParam::produce_if_not_constant<FloatParam>(
+    third_round_1 = FloatParamS::produce_if_not_constant<FloatParamS>(
         float_param, 2, short_round_length
     );
-    third_round_2 = FloatParam::produce_if_not_constant<FloatParam>(
+    third_round_2 = FloatParamS::produce_if_not_constant<FloatParamS>(
         float_param, 2, short_round_length
     );
 
@@ -816,8 +882,8 @@ TEST(auto_skipping_a_follower_float_param_advances_the_clock_of_the_leader, {
         0.875, 1.0,
         /* 1.0, 1.0, 1.0, 1.0, 1.0, */
     };
-    FloatParam leader("float", -1.0, 1.0, 0.0);
-    FloatParam follower(leader);
+    FloatParamS leader("float", -1.0, 1.0, 0.0);
+    FloatParamS follower(leader);
     Sample const* first_round;
     Sample const* second_round_1;
     Sample const* second_round_2;
@@ -833,19 +899,19 @@ TEST(auto_skipping_a_follower_float_param_advances_the_clock_of_the_leader, {
     follower.set_block_size(block_size);
     follower.set_sample_rate(2.0);
 
-    first_round = FloatParam::produce_if_not_constant(
+    first_round = FloatParamS::produce_if_not_constant(
         follower, 0, short_round_length
     );
-    second_round_1 = FloatParam::produce_if_not_constant(
+    second_round_1 = FloatParamS::produce_if_not_constant(
         follower, 1, short_round_length
     );
-    second_round_2 = FloatParam::produce_if_not_constant<FloatParam>(
+    second_round_2 = FloatParamS::produce_if_not_constant<FloatParamS>(
         follower, 1, short_round_length
     );
-    third_round_1 = FloatParam::produce_if_not_constant<FloatParam>(
+    third_round_1 = FloatParamS::produce_if_not_constant<FloatParamS>(
         follower, 2, short_round_length
     );
-    third_round_2 = FloatParam::produce_if_not_constant<FloatParam>(
+    third_round_2 = FloatParamS::produce_if_not_constant<FloatParamS>(
         follower, 2, short_round_length
     );
 
@@ -861,15 +927,15 @@ template<class FloatParamClass>
 void test_follower_signal()
 {
     constexpr Integer block_size = 10;
-    FloatParam leader("float", -1.0, 1.0, 0.0);
+    FloatParamS leader("float", -1.0, 1.0, 0.0);
     FloatParamClass follower(leader);
     Sample const* const* leader_samples;
     Sample const* const* follower_samples;
     Integer const follower_change_index_before = follower.get_change_index();
     Integer const leader_change_index_before = leader.get_change_index();
 
-    leader_samples = FloatParam::produce<FloatParam>(leader, 1, block_size);
-    follower_samples = FloatParam::produce<FloatParamClass>(follower, 1, block_size);
+    leader_samples = FloatParamS::produce<FloatParamS>(leader, 1, block_size);
+    follower_samples = FloatParamS::produce<FloatParamClass>(follower, 1, block_size);
 
     Integer const follower_change_index_after = follower.get_change_index();
     Integer const leader_change_index_after = leader.get_change_index();
@@ -882,7 +948,7 @@ void test_follower_signal()
 
 
 TEST(when_a_float_param_is_following_another_then_it_does_not_render_its_own_signal, {
-    test_follower_signal<FloatParam>();
+    test_follower_signal<FloatParamS>();
     test_follower_signal< ModulatableFloatParam<SignalProducer> >();
 })
 
@@ -890,7 +956,7 @@ TEST(when_a_float_param_is_following_another_then_it_does_not_render_its_own_sig
 template<class FloatParamClass>
 void test_follower_value()
 {
-    FloatParam leader("float", -1.0, 1.0, 0.0);
+    FloatParamS leader("float", -1.0, 1.0, 0.0);
     FloatParamClass follower(leader);
 
     leader.set_value(0.5);
@@ -901,7 +967,7 @@ void test_follower_value()
 
 
 TEST(when_a_float_param_is_following_another_then_it_has_the_same_value, {
-    test_follower_value<FloatParam>();
+    test_follower_value<FloatParamS>();
     test_follower_value< ModulatableFloatParam<SignalProducer> >();
 })
 
@@ -910,7 +976,7 @@ template<class FloatParamClass>
 void test_follower_constantness()
 {
     constexpr Integer block_size = 5;
-    FloatParam leader("float", -1.0, 1.0, 0.0);
+    FloatParamS leader("float", -1.0, 1.0, 0.0);
     FloatParamClass follower(leader);
 
     leader.set_block_size(block_size);
@@ -927,14 +993,14 @@ void test_follower_constantness()
     assert_eq(0.0, follower.get_value());
 
     assert_true(follower.is_constant_in_next_round(1, block_size), "next_round=1");
-    FloatParam::produce<FloatParam>(leader, 1);
+    FloatParamS::produce<FloatParamS>(leader, 1);
     assert_true(follower.is_constant_in_next_round(1, block_size), "next_round=1");
 
     Integer const follower_change_index_before = follower.get_change_index();
     Integer const leader_change_index_before = leader.get_change_index();
 
     assert_false(follower.is_constant_in_next_round(2, block_size), "next_round=2");
-    FloatParam::produce<FloatParam>(leader, 2);
+    FloatParamS::produce<FloatParamS>(leader, 2);
     assert_false(follower.is_constant_in_next_round(2, block_size), "next_round=2");
 
     Integer const follower_change_index_after = follower.get_change_index();
@@ -950,12 +1016,12 @@ void test_follower_constantness()
 
 
 TEST(when_a_float_param_is_following_another_then_it_is_constant_if_the_leader_is_constant, {
-    test_follower_constantness<FloatParam>();
+    test_follower_constantness<FloatParamS>();
     test_follower_constantness< ModulatableFloatParam<SignalProducer> >();
 })
 
 
-TEST(when_a_float_param_does_not_have_an_envelope_then_applying_envelope_is_noop, {
+TEST(when_a_float_param_does_not_have_an_envelope_then_applying_envelope_is_no_op, {
     constexpr Integer block_size = 10;
     constexpr Integer rounds = 1;
     constexpr Integer sample_count = block_size * rounds;
@@ -963,7 +1029,7 @@ TEST(when_a_float_param_does_not_have_an_envelope_then_applying_envelope_is_noop
         1.0, 1.0, 1.0, 1.0, 1.0,
         1.0, 1.0, 1.0, 1.0, 1.0,
     };
-    FloatParam float_param("float", -1.0, 1.0, 0.0);
+    FloatParamS float_param("float", -1.0, 1.0, 0.0);
     Sample const* const* rendered_samples;
 
     float_param.set_sample_rate(1.0);
@@ -974,7 +1040,7 @@ TEST(when_a_float_param_does_not_have_an_envelope_then_applying_envelope_is_noop
 
     assert_true(float_param.is_constant_until(block_size));
 
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
 
     assert_eq(expected_samples, rendered_samples[0], sample_count, DOUBLE_DELTA);
 })
@@ -986,7 +1052,7 @@ TEST(when_a_float_param_does_have_an_envelope_then_dahds_can_be_applied, {
         0.0, 0.0, 1.0, 2.0, 3.0,
         3.0, 2.0, 1.0, 1.0, 1.0,
     };
-    FloatParam float_param("float", -5.0, 5.0, 0.0);
+    FloatParamS float_param("float", -5.0, 5.0, 0.0);
     Envelope envelope("env");
     Sample const* const* rendered_samples;
 
@@ -1013,7 +1079,7 @@ TEST(when_a_float_param_does_have_an_envelope_then_dahds_can_be_applied, {
     assert_false(float_param.is_constant_until(2));
 
     assert_false(float_param.is_constant_in_next_round(1, block_size));
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
     assert_false(float_param.is_constant_in_next_round(1, block_size));
 
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
@@ -1026,7 +1092,7 @@ TEST(a_float_param_envelope_may_be_released_before_dahds_is_completed, {
         0.0, 0.0, 1.0, 2.0, 3.0,
         1.5, 0.0, 0.0, 0.0, 0.0,
     };
-    FloatParam float_param("float", -5.0, 5.0, 0.0);
+    FloatParamS float_param("float", -5.0, 5.0, 0.0);
     Envelope envelope("env");
     Sample const* const* rendered_samples;
 
@@ -1052,18 +1118,57 @@ TEST(a_float_param_envelope_may_be_released_before_dahds_is_completed, {
     assert_false(float_param.is_constant_until(2));
     assert_false(float_param.is_constant_in_next_round(1, block_size));
 
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
 
 
-TEST(envelope_release_time_is_saved_when_the_envelope_is_started, {
+TEST(a_float_param_envelope_may_be_released_immediately, {
+    constexpr Integer block_size = 10;
+    constexpr Sample expected_samples[block_size] = {
+        5.0, 0.0, -1.0, -2.0, -2.0,
+        -2.0, -2.0, -2.0, -2.0, -2.0,
+    };
+    FloatParamS float_param("float", -5.0, 5.0, 0.0);
+    Envelope envelope("env");
+    Sample const* const* rendered_samples;
+
+    float_param.set_block_size(block_size);
+    float_param.set_sample_rate(1.0);
+
+    float_param.set_value(5.0);
+    float_param.set_envelope(&envelope);
+
+    envelope.amount.set_value(0.8);
+    envelope.initial_value.set_value(0.625);
+    envelope.delay_time.set_value(0.5);
+    envelope.attack_time.set_value(3.0);
+    envelope.peak_value.set_value(1.0);
+    envelope.hold_time.set_value(1.0);
+    envelope.decay_time.set_value(2.0);
+    envelope.sustain_value.set_value(0.75);
+    envelope.release_time.set_value(2.0);
+    envelope.final_value.set_value(0.375);
+
+    float_param.start_envelope(1.0);
+    assert_eq(2.0, float_param.end_envelope(1.0), DOUBLE_DELTA);
+
+    assert_true(float_param.is_constant_until(1));
+    assert_false(float_param.is_constant_until(2));
+    assert_false(float_param.is_constant_in_next_round(1, block_size));
+
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
+    assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
+})
+
+
+TEST(envelope_release_params_are_saved_when_the_envelope_is_started, {
     constexpr Integer block_size = 10;
     constexpr Sample expected_samples[block_size] = {
         0.0, 0.0, 1.0, 2.0, 3.0,
         1.5, 0.0, 0.0, 0.0, 0.0,
     };
-    FloatParam float_param("float", -5.0, 5.0, 0.0);
+    FloatParamS float_param("float", -5.0, 5.0, 0.0);
     Envelope envelope("env");
     Sample const* const* rendered_samples;
 
@@ -1085,6 +1190,8 @@ TEST(envelope_release_time_is_saved_when_the_envelope_is_started, {
     float_param.start_envelope(0.3);
 
     envelope.release_time.set_value(0.123);
+    envelope.amount.set_value(1.0);
+    envelope.final_value.set_value(1.0);
 
     assert_eq(2.0, float_param.end_envelope(4.0), DOUBLE_DELTA);
 
@@ -1092,7 +1199,44 @@ TEST(envelope_release_time_is_saved_when_the_envelope_is_started, {
     assert_false(float_param.is_constant_until(2));
     assert_false(float_param.is_constant_in_next_round(1, block_size));
 
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
+    assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
+})
+
+
+TEST(cancelling_an_envelope_releases_it_in_a_given_amount_of_time, {
+    constexpr Integer block_size = 10;
+    constexpr Sample expected_samples[block_size] = {
+        0.0, 0.0, 1.0, 2.0, 3.0,
+        1.5, 0.0, 0.0, 0.0, 0.0,
+    };
+    FloatParamS float_param("float", -5.0, 5.0, 0.0);
+    Envelope envelope("env");
+    Sample const* const* rendered_samples;
+
+    float_param.set_block_size(block_size);
+    float_param.set_sample_rate(1.0);
+
+    envelope.dynamic.set_value(ToggleParam::ON);
+    envelope.amount.set_value(0.8);
+    envelope.initial_value.set_value(0.625);
+    envelope.delay_time.set_value(0.7);
+    envelope.attack_time.set_value(3.0);
+    envelope.peak_value.set_value(1.0);
+    envelope.hold_time.set_value(1.0);
+    envelope.decay_time.set_value(2.0);
+    envelope.sustain_value.set_value(0.75);
+    envelope.release_time.set_value(0.1);
+    envelope.final_value.set_value(0.625);
+
+    float_param.set_envelope(&envelope);
+
+    envelope.release_time.set_value(0.01);
+
+    float_param.start_envelope(0.3);
+    float_param.cancel_envelope(4.0, 2.0);
+
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 })
 
@@ -1105,7 +1249,7 @@ void test_follower_envelope()
         0.0, 0.0, 1.0, 2.0, 3.0,
         1.5, 0.0, 0.0, 0.0, 0.0,
     };
-    FloatParam leader("follow", -5.0, 5.0, 0.0);
+    FloatParamS leader("follow", -5.0, 5.0, 0.0);
     FloatParamClass follower(leader);
     Envelope envelope("env");
     Sample const* const* rendered_samples;
@@ -1140,14 +1284,70 @@ void test_follower_envelope()
     assert_true(follower.is_constant_until(1));
     assert_false(follower.is_constant_until(2));
 
-    rendered_samples = FloatParam::produce<FloatParamClass>(follower, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamClass>(follower, 1, block_size);
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 }
 
 
 TEST(follower_float_param_follows_the_leaders_envelope, {
-    test_follower_envelope<FloatParam>();
+    test_follower_envelope<FloatParamS>();
     test_follower_envelope< ModulatableFloatParam<SignalProducer> >();
+})
+
+
+template<class FloatParamClass>
+void test_follower_envelope_cancellation()
+{
+    constexpr Integer block_size = 10;
+    constexpr Sample expected_samples[block_size] = {
+        0.0, 0.0, 1.0, 2.0, 3.0,
+        1.5, 0.0, 0.0, 0.0, 0.0,
+    };
+    FloatParamS leader("follow", -5.0, 5.0, 0.0);
+    FloatParamClass follower(leader);
+    Envelope envelope("env");
+    Sample const* const* rendered_samples;
+
+    leader.set_block_size(block_size);
+    leader.set_sample_rate(1.0);
+    leader.set_envelope(&envelope);
+    leader.set_value(0.2);
+
+    follower.set_block_size(block_size);
+    follower.set_sample_rate(1.0);
+
+    assert_eq((void*)&envelope, (void*)follower.get_envelope());
+
+    envelope.amount.set_value(0.8);
+    envelope.initial_value.set_value(0.625);
+    envelope.delay_time.set_value(0.7);
+    envelope.attack_time.set_value(3.0);
+    envelope.peak_value.set_value(1.0);
+    envelope.hold_time.set_value(1.0);
+    envelope.decay_time.set_value(2.0);
+    envelope.sustain_value.set_value(0.75);
+    envelope.release_time.set_value(6.0);
+    envelope.final_value.set_value(0.625);
+
+    follower.start_envelope(0.3);
+
+    envelope.release_time.set_value(0.123);
+
+    follower.end_envelope(4.0);
+    follower.cancel_envelope(4.001, 1.999);
+    assert_eq(1.999, follower.end_envelope(5.0), DOUBLE_DELTA);
+
+    assert_true(follower.is_constant_until(1));
+    assert_false(follower.is_constant_until(2));
+
+    rendered_samples = FloatParamS::produce<FloatParamClass>(follower, 1, block_size);
+    assert_eq(expected_samples, rendered_samples[0], block_size, 0.001);
+}
+
+
+TEST(canceling_follower_float_param_envelope_releases_it_in_the_given_amount_of_time, {
+    test_follower_envelope_cancellation<FloatParamS>();
+    test_follower_envelope_cancellation< ModulatableFloatParam<SignalProducer> >();
 })
 
 
@@ -1163,7 +1363,7 @@ void test_follower_dynamic_envelope()
         1.0, 1.0, 1.0, 1.0, 1.0,
         0.5, 0.0, 0.0, 0.0, 0.0,
     };
-    FloatParam leader("follow", -5.0, 5.0, 0.0);
+    FloatParamS leader("follow", -5.0, 5.0, 0.0);
     FloatParamClass follower(leader);
     Envelope envelope("env");
     Sample const* rendered_samples;
@@ -1194,9 +1394,9 @@ void test_follower_dynamic_envelope()
 
     envelope.release_time.set_value(2.0);
 
-    assert_eq(2.0, follower.end_envelope(29.0));
+    assert_eq(2.0, follower.end_envelope(29.0), DOUBLE_DELTA);
 
-    FloatParam::produce<FloatParamClass>(follower, 1, 6);
+    FloatParamS::produce<FloatParamClass>(follower, 1, 6);
 
     envelope.amount.set_value(0.8);
     envelope.initial_value.set_value(0.625);
@@ -1210,18 +1410,18 @@ void test_follower_dynamic_envelope()
 
     assert_false(follower.is_constant_until(2));
 
-    rendered_samples = FloatParam::produce_if_not_constant<FloatParamClass>(
+    rendered_samples = FloatParamS::produce_if_not_constant<FloatParamClass>(
         follower, 2, block_size
     );
     assert_eq(expected_dahd_samples, rendered_samples, block_size, DOUBLE_DELTA);
 
     assert_true(follower.is_constant_until(block_size));
-    rendered_samples = FloatParam::produce_if_not_constant<FloatParamClass>(
+    rendered_samples = FloatParamS::produce_if_not_constant<FloatParamClass>(
         follower, 3, block_size
     );
     assert_eq(NULL, rendered_samples, block_size, DOUBLE_DELTA);
 
-    rendered_samples = FloatParam::produce_if_not_constant<FloatParamClass>(
+    rendered_samples = FloatParamS::produce_if_not_constant<FloatParamClass>(
         follower, 4, block_size
     );
     assert_eq(expected_r_samples, rendered_samples, block_size, DOUBLE_DELTA);
@@ -1229,8 +1429,94 @@ void test_follower_dynamic_envelope()
 
 
 TEST(when_the_envelope_is_dynamic_then_the_param_reacts_to_its_changes_during_dahds, {
-    test_follower_dynamic_envelope<FloatParam>();
+    test_follower_dynamic_envelope<FloatParamS>();
     test_follower_dynamic_envelope< ModulatableFloatParam<SignalProducer> >();
+})
+
+
+template<class FloatParamClass>
+void test_follower_update_envelope()
+{
+    constexpr Integer block_size = 10;
+    constexpr Sample expected_dahd_samples[block_size] = {
+        0.0, 1.0, 2.0, 3.0, 3.0,
+        3.0, 2.5, 2.0, 1.5, 1.0,
+    };
+    constexpr Sample expected_r_samples[block_size] = {
+        1.0, 1.0, 1.0, 1.0, 1.0,
+        0.5, 0.0, 0.0, 0.0, 0.0,
+    };
+    FloatParamS leader("follow", -5.0, 5.0, 0.0);
+    FloatParamClass follower(leader);
+    Envelope envelope("env");
+    Sample const* rendered_samples;
+
+    leader.set_block_size(block_size);
+    leader.set_sample_rate(1.0);
+    leader.set_envelope(&envelope);
+    leader.set_value(0.2);
+
+    follower.set_block_size(block_size);
+    follower.set_sample_rate(1.0);
+
+    assert_eq((void*)&envelope, (void*)follower.get_envelope());
+
+    envelope.dynamic.set_value(ToggleParam::OFF);
+    envelope.amount.set_value(0.1);
+    envelope.initial_value.set_value(0.1);
+    envelope.delay_time.set_value(5.7);
+    envelope.attack_time.set_value(0.1);
+    envelope.peak_value.set_value(0.1);
+    envelope.hold_time.set_value(0.1);
+    envelope.decay_time.set_value(0.1);
+    envelope.sustain_value.set_value(0.1);
+    envelope.release_time.set_value(5.0);
+    envelope.final_value.set_value(0.625);
+
+    follower.start_envelope(0.3);
+    FloatParamS::produce<FloatParamClass>(follower, 0, 2);
+
+    envelope.release_time.set_value(2.0);
+    follower.update_envelope(1.0);
+
+    assert_eq(2.0, follower.end_envelope(28.0), DOUBLE_DELTA);
+
+    FloatParamS::produce<FloatParamClass>(follower, 1, 4);
+
+    envelope.amount.set_value(0.8);
+    envelope.initial_value.set_value(0.625);
+    envelope.delay_time.set_value(5.7);
+    envelope.attack_time.set_value(3.0);
+    envelope.peak_value.set_value(1.0);
+    envelope.hold_time.set_value(2.0);
+    envelope.decay_time.set_value(4.0);
+    envelope.sustain_value.set_value(0.75);
+    envelope.release_time.set_value(6.0);
+    follower.update_envelope(0.0);
+
+    assert_false(follower.is_constant_until(2));
+
+    rendered_samples = FloatParamS::produce_if_not_constant<FloatParamClass>(
+        follower, 2, block_size
+    );
+    assert_eq(expected_dahd_samples, rendered_samples, block_size, DOUBLE_DELTA);
+
+    assert_true(follower.is_constant_until(block_size));
+    rendered_samples = FloatParamS::produce_if_not_constant<FloatParamClass>(
+        follower, 3, block_size
+    );
+    assert_eq(NULL, rendered_samples, block_size, DOUBLE_DELTA);
+
+    rendered_samples = FloatParamS::produce_if_not_constant<FloatParamClass>(
+        follower, 4, block_size
+    );
+    assert_eq(expected_r_samples, rendered_samples, block_size, DOUBLE_DELTA);
+}
+
+
+TEST(when_the_envelope_is_updated_manually_then_the_param_reacts_to_its_changes_during_dahds, {
+    test_follower_update_envelope<FloatParamS>();
+    test_follower_update_envelope< ModulatableFloatParam<SignalProducer> >();
 })
 
 
@@ -1239,7 +1525,7 @@ TEST(when_a_midi_controller_is_assigned_to_a_float_param_then_float_param_value_
     constexpr Sample expected_samples[block_size] = {
         3.0, 3.0, -2.5, -2.5, -2.5,
     };
-    FloatParam float_param("float", -5.0, 5.0, 3.0, 0.5);
+    FloatParamS float_param("float", -5.0, 5.0, 3.0, 0.5);
     MidiController midi_controller;
     Integer change_index_1;
     Integer change_index_2;
@@ -1258,7 +1544,7 @@ TEST(when_a_midi_controller_is_assigned_to_a_float_param_then_float_param_value_
     midi_controller.change(1.5, 0.2514);
     change_index_2 = float_param.get_change_index();
 
-    // Non-sample-exact param usage.
+    /* Non-sample-exact param usage. */
     assert_eq(-2.5, float_param.get_value(), DOUBLE_DELTA);
     assert_eq(0.2514, float_param.get_ratio(), DOUBLE_DELTA);
 
@@ -1267,9 +1553,9 @@ TEST(when_a_midi_controller_is_assigned_to_a_float_param_then_float_param_value_
     assert_true(float_param.is_constant_until(2));
     assert_false(float_param.is_constant_until(3));
 
-    // Sample-exact param usage.
+    /* Sample-exact param usage. */
     assert_false(float_param.is_constant_in_next_round(1, block_size));
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
     assert_false(float_param.is_constant_in_next_round(1, block_size));
 
     assert_eq(expected_samples, rendered_samples[0], block_size, 0.01);
@@ -1283,11 +1569,11 @@ TEST(when_a_midi_controller_is_assigned_to_a_float_param_then_float_param_value_
 TEST(float_param_follows_midi_controller_changes_gradually, {
     constexpr Integer block_size = 2000;
     constexpr Frequency sample_rate = 3000.0;
-    constexpr Seconds big_change_duration = FloatParam::MIDI_CTL_BIG_CHANGE_DURATION;
-    constexpr Seconds small_change_duration = FloatParam::MIDI_CTL_SMALL_CHANGE_DURATION;
+    constexpr Seconds big_change_duration = FloatParamS::MIDI_CTL_BIG_CHANGE_DURATION;
+    constexpr Seconds small_change_duration = FloatParamS::MIDI_CTL_SMALL_CHANGE_DURATION;
 
-    FloatParam reference_float_param("reference", 0.0, 10.0, 0.0);
-    FloatParam float_param("float", 0.0, 10.0, 0.0);
+    FloatParamS reference_float_param("reference", 0.0, 10.0, 0.0);
+    FloatParamS float_param("float", 0.0, 10.0, 0.0);
     MidiController midi_controller;
     Sample const* expected_samples;
     Sample const* rendered_samples;
@@ -1321,8 +1607,8 @@ TEST(float_param_follows_midi_controller_changes_gradually, {
     reference_float_param.schedule_linear_ramp(0.3, 3.3);
     reference_float_param.schedule_linear_ramp(big_change_duration * 0.63, 9.6);
 
-    expected_samples = FloatParam::produce_if_not_constant(reference_float_param, 1, block_size);
-    rendered_samples = FloatParam::produce_if_not_constant(float_param, 1, block_size);
+    expected_samples = FloatParamS::produce_if_not_constant(reference_float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce_if_not_constant(float_param, 1, block_size);
 
     assert_eq(expected_samples, rendered_samples, block_size, DOUBLE_DELTA);
 })
@@ -1335,7 +1621,7 @@ void test_follower_midi_controller()
     constexpr Sample expected_samples[block_size] = {
         3.0, 3.0, -2.5, -2.5, -2.5,
     };
-    FloatParam leader("float", -5.0, 5.0, 3.0, 0.5);
+    FloatParamS leader("float", -5.0, 5.0, 3.0, 0.5);
     FloatParamClass follower(leader);
     MidiController midi_controller;
     Integer change_index_1;
@@ -1365,8 +1651,8 @@ void test_follower_midi_controller()
     assert_false(follower.is_constant_until(3));
 
     assert_false(follower.is_constant_in_next_round(1, block_size));
-    leader_samples = FloatParam::produce<FloatParam>(leader, 1, block_size);
-    follower_samples = FloatParam::produce<FloatParamClass>(follower, 1, block_size);
+    leader_samples = FloatParamS::produce<FloatParamS>(leader, 1, block_size);
+    follower_samples = FloatParamS::produce<FloatParamClass>(follower, 1, block_size);
     assert_false(follower.is_constant_in_next_round(1, block_size));
 
     assert_eq(expected_samples, follower_samples[0], block_size, 0.01);
@@ -1379,49 +1665,47 @@ void test_follower_midi_controller()
 
 
 TEST(when_a_midi_controller_is_assigned_to_the_leader_of_a_float_param_then_the_follower_value_follows_the_changes_of_the_midi_controller, {
-    test_follower_midi_controller<FloatParam>();
+    test_follower_midi_controller<FloatParamS>();
     test_follower_midi_controller< ModulatableFloatParam<SignalProducer> >();
 })
 
 
-TEST(when_a_flexible_controller_is_assigned_to_a_float_param_then_float_param_value_follows_the_changes_of_the_flexible_controller, {
+TEST(when_a_macro_is_assigned_to_a_float_param_then_float_param_value_follows_the_changes_of_the_macro, {
     constexpr Integer block_size = 5;
     constexpr Sample expected_samples[block_size] = {
         3.0, 3.0, 3.0, 3.0, 3.0,
     };
     constexpr Frequency sample_rate = 1.0;
-    FloatParam float_param("float", 0.0, 10.0, 9.0, 1.0);
-    FlexibleController flexible_controller;
+    FloatParamS float_param("float", 0.0, 10.0, 9.0, 1.0);
+    Macro macro;
     Integer change_index;
     Sample const* const* rendered_samples;
 
     float_param.set_block_size(block_size);
-    flexible_controller.input.set_block_size(block_size);
-    flexible_controller.amount.set_block_size(block_size);
-    flexible_controller.min.set_block_size(block_size);
-    flexible_controller.max.set_block_size(block_size);
-    flexible_controller.distortion.set_block_size(block_size);
-    flexible_controller.randomness.set_block_size(block_size);
+    macro.input.set_block_size(block_size);
+    macro.amount.set_block_size(block_size);
+    macro.min.set_block_size(block_size);
+    macro.max.set_block_size(block_size);
+    macro.distortion.set_block_size(block_size);
+    macro.randomness.set_block_size(block_size);
 
     float_param.set_sample_rate(sample_rate);
-    flexible_controller.input.set_sample_rate(sample_rate);
-    flexible_controller.amount.set_sample_rate(sample_rate);
-    flexible_controller.min.set_sample_rate(sample_rate);
-    flexible_controller.max.set_sample_rate(sample_rate);
-    flexible_controller.distortion.set_sample_rate(sample_rate);
-    flexible_controller.randomness.set_sample_rate(sample_rate);
+    macro.input.set_sample_rate(sample_rate);
+    macro.amount.set_sample_rate(sample_rate);
+    macro.min.set_sample_rate(sample_rate);
+    macro.max.set_sample_rate(sample_rate);
+    macro.distortion.set_sample_rate(sample_rate);
+    macro.randomness.set_sample_rate(sample_rate);
 
-    flexible_controller.input.set_value(0.2);
-    flexible_controller.amount.set_value(0.5);
+    macro.input.set_value(0.2);
+    macro.amount.set_value(0.5);
 
-    float_param.set_flexible_controller(&flexible_controller);
+    float_param.set_macro(&macro);
 
-    assert_eq(
-        (void*)&flexible_controller, (void*)float_param.get_flexible_controller()
-    );
+    assert_eq((void*)&macro, (void*)float_param.get_macro());
     assert_eq(1.0, float_param.get_value());
 
-    flexible_controller.input.set_value(0.64);
+    macro.input.set_value(0.64);
 
     assert_false(float_param.is_constant_in_next_round(1, block_size));
 
@@ -1429,15 +1713,15 @@ TEST(when_a_flexible_controller_is_assigned_to_a_float_param_then_float_param_va
     assert_eq(3.0, float_param.get_value(), DOUBLE_DELTA);
     assert_eq(0.32, float_param.get_ratio(), DOUBLE_DELTA);
 
-    rendered_samples = FloatParam::produce<FloatParam>(float_param, 1, block_size);
+    rendered_samples = FloatParamS::produce<FloatParamS>(float_param, 1, block_size);
     assert_eq(expected_samples, rendered_samples[0], block_size, DOUBLE_DELTA);
 
     assert_eq((int)change_index, (int)float_param.get_change_index());
 
-    flexible_controller.input.set_value(0.4);
+    macro.input.set_value(0.4);
     assert_neq((int)change_index, (int)float_param.get_change_index());
 
-    float_param.set_flexible_controller(NULL);
+    float_param.set_macro(NULL);
     assert_eq(2.0, float_param.get_value(), DOUBLE_DELTA);
 })
 
@@ -1446,8 +1730,8 @@ TEST(when_an_lfo_is_assigned_to_a_float_param_then_float_param_value_follows_the
     constexpr Integer block_size = 1024;
     constexpr Frequency sample_rate = 11025.0;
     constexpr Frequency frequency = 20.0;
-    FloatParam float_param("float", -3.0, 7.0, 2.0);
-    FloatParam fast_float_param("fast-float", 0.0, 1.0, 1.0);
+    FloatParamS float_param("float", -3.0, 7.0, 2.0);
+    FloatParamS fast_float_param("fast-float", 0.0, 1.0, 1.0);
     LFO lfo("lfo");
     Sample const* rendered_samples;
     Sample const* lfo_buffer;
@@ -1477,14 +1761,14 @@ TEST(when_an_lfo_is_assigned_to_a_float_param_then_float_param_value_follows_the
     assert_false(float_param.is_constant_in_next_round(1, block_size));
 
     render_rounds<SumOfSines>(expected, expected_output, 1);
-    rendered_samples = FloatParam::produce_if_not_constant(
+    rendered_samples = FloatParamS::produce_if_not_constant(
         float_param, 1, block_size
     );
     lfo_buffer = SignalProducer::produce<LFO>(lfo, 1, block_size)[0];
 
     assert_eq(expected_output.samples[0], rendered_samples, block_size, 0.001);
 
-    rendered_samples = FloatParam::produce_if_not_constant(
+    rendered_samples = FloatParamS::produce_if_not_constant(
         fast_float_param, 1, block_size
     );
     assert_eq((void*)lfo_buffer, (void*)rendered_samples);
@@ -1499,7 +1783,7 @@ void test_follower_lfo()
     constexpr Integer block_size = 1024;
     constexpr Frequency sample_rate = 11025.0;
     constexpr Frequency frequency = 20.0;
-    FloatParam leader("leader", -3.0, 7.0, 2.0);
+    FloatParamS leader("leader", -3.0, 7.0, 2.0);
     FloatParamClass follower(leader);
     LFO lfo("lfo");
     Sample const* rendered_samples;
@@ -1527,7 +1811,7 @@ void test_follower_lfo()
     assert_false(follower.is_constant_in_next_round(1, block_size));
 
     render_rounds<SumOfSines>(expected, expected_output, 1);
-    rendered_samples = FloatParam::produce_if_not_constant<FloatParamClass>(
+    rendered_samples = FloatParamS::produce_if_not_constant<FloatParamClass>(
         follower, 1, block_size
     );
 
@@ -1536,52 +1820,52 @@ void test_follower_lfo()
 
 
 TEST(when_an_lfo_is_assigned_to_the_leader_of_a_float_param_then_the_follower_value_follows_the_changes_of_the_lfo, {
-    test_follower_lfo<FloatParam>();
+    test_follower_lfo<FloatParamS>();
     test_follower_lfo< ModulatableFloatParam<SignalProducer> >();
 })
 
 
 template<class FloatParamClass>
-void test_follower_flexible_controller()
+void test_follower_macro()
 {
     constexpr Integer block_size = 5;
     constexpr Sample expected_samples[block_size] = {
         3.0, 3.0, 3.0, 3.0, 3.0,
     };
     constexpr Frequency sample_rate = 1.0;
-    FloatParam leader("leader", 0.0, 10.0, 9.0, 1.0);
+    FloatParamS leader("leader", 0.0, 10.0, 9.0, 1.0);
     FloatParamClass follower(leader);
-    FlexibleController flexible_controller;
+    Macro macro;
     Integer change_index;
     Sample const* const* leader_samples;
     Sample const* const* follower_samples;
 
     leader.set_block_size(block_size);
     follower.set_block_size(block_size);
-    flexible_controller.input.set_block_size(block_size);
-    flexible_controller.amount.set_block_size(block_size);
-    flexible_controller.min.set_block_size(block_size);
-    flexible_controller.max.set_block_size(block_size);
-    flexible_controller.distortion.set_block_size(block_size);
-    flexible_controller.randomness.set_block_size(block_size);
+    macro.input.set_block_size(block_size);
+    macro.amount.set_block_size(block_size);
+    macro.min.set_block_size(block_size);
+    macro.max.set_block_size(block_size);
+    macro.distortion.set_block_size(block_size);
+    macro.randomness.set_block_size(block_size);
 
     leader.set_sample_rate(sample_rate);
     follower.set_sample_rate(sample_rate);
-    flexible_controller.input.set_sample_rate(sample_rate);
-    flexible_controller.amount.set_sample_rate(sample_rate);
-    flexible_controller.min.set_sample_rate(sample_rate);
-    flexible_controller.max.set_sample_rate(sample_rate);
-    flexible_controller.distortion.set_sample_rate(sample_rate);
-    flexible_controller.randomness.set_sample_rate(sample_rate);
+    macro.input.set_sample_rate(sample_rate);
+    macro.amount.set_sample_rate(sample_rate);
+    macro.min.set_sample_rate(sample_rate);
+    macro.max.set_sample_rate(sample_rate);
+    macro.distortion.set_sample_rate(sample_rate);
+    macro.randomness.set_sample_rate(sample_rate);
 
-    flexible_controller.input.set_value(0.2);
-    flexible_controller.amount.set_value(0.5);
+    macro.input.set_value(0.2);
+    macro.amount.set_value(0.5);
 
-    leader.set_flexible_controller(&flexible_controller);
+    leader.set_macro(&macro);
 
     assert_eq(1.0, follower.get_value());
 
-    flexible_controller.input.set_value(0.64);
+    macro.input.set_value(0.64);
 
     assert_false(follower.is_constant_in_next_round(1, block_size));
 
@@ -1589,24 +1873,24 @@ void test_follower_flexible_controller()
     assert_eq(3.0, follower.get_value(), DOUBLE_DELTA);
     assert_eq(0.32, follower.get_ratio(), DOUBLE_DELTA);
 
-    follower_samples = FloatParam::produce<FloatParamClass>(follower, 1, block_size);
-    leader_samples = FloatParam::produce<FloatParam>(leader, 1, block_size);
+    follower_samples = FloatParamS::produce<FloatParamClass>(follower, 1, block_size);
+    leader_samples = FloatParamS::produce<FloatParamS>(leader, 1, block_size);
     assert_eq(expected_samples, follower_samples[0], block_size, DOUBLE_DELTA);
     assert_eq((void*)leader_samples, (void*)follower_samples);
 
     assert_eq((int)change_index, (int)follower.get_change_index());
 
-    flexible_controller.input.set_value(0.4);
+    macro.input.set_value(0.4);
     assert_neq((int)change_index, (int)follower.get_change_index());
 
-    leader.set_flexible_controller(NULL);
+    leader.set_macro(NULL);
     assert_eq(2.0, follower.get_value(), DOUBLE_DELTA);
 }
 
 
-TEST(when_a_flexible_controller_is_assigned_to_the_leader_of_a_float_param_then_the_follower_value_follows_the_changes_of_the_flexible_controller, {
-    test_follower_flexible_controller<FloatParam>();
-    test_follower_flexible_controller< ModulatableFloatParam<SignalProducer> >();
+TEST(when_a_macro_is_assigned_to_the_leader_of_a_float_param_then_the_follower_value_follows_the_changes_of_the_macro, {
+    test_follower_macro<FloatParamS>();
+    test_follower_macro< ModulatableFloatParam<SignalProducer> >();
 })
 
 
@@ -1621,7 +1905,7 @@ TEST(a_float_param_may_use_logarithmic_scale, {
         0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 12.0, 12.0,
     };
     ToggleParam log_scale("log", ToggleParam::OFF);
-    FloatParam leader(
+    FloatParamS leader(
         "freq",
         min,
         max,
@@ -1629,12 +1913,10 @@ TEST(a_float_param_may_use_logarithmic_scale, {
         0.0,
         &log_scale,
         Math::log_biquad_filter_freq_table(),
-        Math::log_biquad_filter_freq_inv_table(),
         Math::LOG_BIQUAD_FILTER_FREQ_TABLE_MAX_INDEX,
-        Math::LOG_BIQUAD_FILTER_FREQ_SCALE,
-        Math::LOG_BIQUAD_FILTER_FREQ_INV_SCALE
+        Math::LOG_BIQUAD_FILTER_FREQ_SCALE
     );
-    FloatParam follower(leader);
+    FloatParamS follower(leader);
     Envelope envelope("env");
     Sample const* rendered_samples;
     Sample rendered_samples_log[block_size];
@@ -1676,7 +1958,7 @@ TEST(a_float_param_may_use_logarithmic_scale, {
     assert_eq(max, follower.ratio_to_value(1.0), DOUBLE_DELTA);
 
     follower.start_envelope(0.0);
-    follower.cancel_events(12.0 / sample_rate);
+    follower.cancel_events_at(12.0 / sample_rate);
 
     assert_float_param_changes_during_rendering(
         follower, 1, block_size, &rendered_samples
@@ -1727,7 +2009,7 @@ TEST(when_no_modulator_is_set_then_modulated_float_param_is_constant, {
         {6.0, 3.0, 3.0},
     };
 
-    FloatParam modulation_level_leader("MOD", 0.0, 1.0, 1.0);
+    FloatParamS modulation_level_leader("MOD", 0.0, 1.0, 1.0);
     ModulatableFloatParam<Modulator> modulatable_float_param(
         NULL, modulation_level_leader, "", 0.0, 10.0, 0.0
     );
@@ -1744,7 +2026,7 @@ TEST(when_no_modulator_is_set_then_modulated_float_param_is_constant, {
     modulation_level_leader.schedule_linear_ramp(2.0, 1.0);
 
     assert_true(modulatable_float_param.is_constant_in_next_round(1, block_size));
-    rendered_samples = FloatParam::produce< ModulatableFloatParam<Modulator> >(
+    rendered_samples = FloatParamS::produce< ModulatableFloatParam<Modulator> >(
         modulatable_float_param, 1
     );
     assert_true(modulatable_float_param.is_constant_in_next_round(1, block_size));
@@ -1752,7 +2034,7 @@ TEST(when_no_modulator_is_set_then_modulated_float_param_is_constant, {
 
     modulatable_float_param.schedule_value(1.0, 3.0);
     assert_false(modulatable_float_param.is_constant_in_next_round(2, block_size));
-    rendered_samples = FloatParam::produce< ModulatableFloatParam<Modulator> >(
+    rendered_samples = FloatParamS::produce< ModulatableFloatParam<Modulator> >(
         modulatable_float_param, 2
     );
     assert_eq(expected_samples[1], rendered_samples[0], block_size, DOUBLE_DELTA);
@@ -1766,7 +2048,7 @@ TEST(when_modulation_level_is_zero_then_modulated_float_param_is_constant_and_do
     constexpr Sample expected_samples[] = {1.0, 1.0, 1.0};
 
     Modulator modulator;
-    FloatParam modulation_level_leader("MOD", 0.0, 1.0, 0.0);
+    FloatParamS modulation_level_leader("MOD", 0.0, 1.0, 0.0);
     ModulatableFloatParam<Modulator> modulatable_float_param(
         &modulator, modulation_level_leader, "", 0.0, 10.0, 0.0
     );
@@ -1782,7 +2064,7 @@ TEST(when_modulation_level_is_zero_then_modulated_float_param_is_constant_and_do
     modulation_level_leader.set_value(0.0);
 
     assert_true(modulatable_float_param.is_constant_in_next_round(1, block_size));
-    rendered_samples = FloatParam::produce< ModulatableFloatParam<Modulator> >(
+    rendered_samples = FloatParamS::produce< ModulatableFloatParam<Modulator> >(
         modulatable_float_param, 1
     );
     assert_true(modulatable_float_param.is_constant_in_next_round(1, block_size));
@@ -1798,7 +2080,7 @@ TEST(when_modulation_level_is_zero_but_the_modulatable_float_param_is_scheduled_
     constexpr Sample expected_samples[] = {1.0, 2.0, 2.0};
 
     Modulator modulator;
-    FloatParam modulation_level_leader("MOD", 0.0, 1.0, 0.0);
+    FloatParamS modulation_level_leader("MOD", 0.0, 1.0, 0.0);
     ModulatableFloatParam<Modulator> modulatable_float_param(
         &modulator, modulation_level_leader, "", 0.0, 10.0, 0.0
     );
@@ -1815,7 +2097,7 @@ TEST(when_modulation_level_is_zero_but_the_modulatable_float_param_is_scheduled_
     modulation_level_leader.set_value(0.0);
 
     assert_false(modulatable_float_param.is_constant_in_next_round(1, block_size));
-    rendered_samples = FloatParam::produce< ModulatableFloatParam<Modulator> >(
+    rendered_samples = FloatParamS::produce< ModulatableFloatParam<Modulator> >(
         modulatable_float_param, 1
     );
     assert_false(modulatable_float_param.is_constant_in_next_round(1, block_size));
@@ -1837,7 +2119,7 @@ TEST(when_modulation_level_is_positive_then_modulated_float_param_is_not_constan
     };
 
     Modulator modulator;
-    FloatParam modulation_level_leader("MOD", 0.0, 3.0, 3.0);
+    FloatParamS modulation_level_leader("MOD", 0.0, 3.0, 3.0);
     ModulatableFloatParam<Modulator> modulatable_float_param(
         &modulator, modulation_level_leader, "", 0.0, 10.0, 0.0
     );
@@ -1853,7 +2135,7 @@ TEST(when_modulation_level_is_positive_then_modulated_float_param_is_not_constan
     modulation_level_leader.set_value(modulation_level_value);
 
     assert_false(modulatable_float_param.is_constant_in_next_round(1, block_size));
-    rendered_samples = FloatParam::produce< ModulatableFloatParam<Modulator> >(
+    rendered_samples = FloatParamS::produce< ModulatableFloatParam<Modulator> >(
         modulatable_float_param, 1
     );
     assert_false(modulatable_float_param.is_constant_in_next_round(1, block_size));
@@ -1877,7 +2159,7 @@ TEST(when_modulation_level_is_changing_then_modulated_float_param_is_not_constan
     };
 
     Modulator modulator;
-    FloatParam modulation_level_leader("MOD", 0.0, 3.0, 0.0);
+    FloatParamS modulation_level_leader("MOD", 0.0, 3.0, 0.0);
     ModulatableFloatParam<Modulator> modulatable_float_param(
         &modulator, modulation_level_leader, "", 0.0, 10.0, 0.0
     );
@@ -1894,7 +2176,7 @@ TEST(when_modulation_level_is_changing_then_modulated_float_param_is_not_constan
     modulation_level_leader.schedule_value(2.0, modulation_level_value);
 
     assert_false(modulatable_float_param.is_constant_in_next_round(1, block_size));
-    rendered_samples = FloatParam::produce< ModulatableFloatParam<Modulator> >(
+    rendered_samples = FloatParamS::produce< ModulatableFloatParam<Modulator> >(
         modulatable_float_param, 1
     );
     assert_false(modulatable_float_param.is_constant_in_next_round(1, block_size));
@@ -1918,7 +2200,7 @@ TEST(modulation_level_may_be_automated_with_envelope, {
     Envelope envelope("ENV");
 
     Modulator modulator;
-    FloatParam modulation_level_leader("MOD", 0.0, 3.0, 0.0);
+    FloatParamS modulation_level_leader("MOD", 0.0, 3.0, 0.0);
     ModulatableFloatParam<Modulator> modulatable_float_param(
         &modulator, modulation_level_leader, "", 0.0, 10.0, 0.0
     );
@@ -1959,17 +2241,17 @@ TEST(modulation_level_may_be_automated_with_envelope, {
 
     modulatable_float_param.set_value(param_value);
     modulatable_float_param.start_envelope(6.0);
-    assert_eq(3.0, modulatable_float_param.end_envelope(12.0));
+    assert_eq(3.0, modulatable_float_param.end_envelope(12.0), DOUBLE_DELTA);
 
     assert_eq(
         NULL,
-        (void*)FloatParam::produce_if_not_constant< ModulatableFloatParam<Modulator> >(
+        (void*)FloatParamS::produce_if_not_constant< ModulatableFloatParam<Modulator> >(
             modulatable_float_param, 1, block_size
         )
     );
 
     assert_false(modulatable_float_param.is_constant_in_next_round(2, block_size));
-    rendered_samples = FloatParam::produce< ModulatableFloatParam<Modulator> >(
+    rendered_samples = FloatParamS::produce< ModulatableFloatParam<Modulator> >(
         modulatable_float_param, 2
     );
     assert_false(modulatable_float_param.is_constant_in_next_round(2, block_size));
@@ -1989,7 +2271,7 @@ TEST(modulated_values_are_not_clamped, {
     };
 
     Modulator modulator;
-    FloatParam modulation_level_leader("MOD", 0.0, 3.0, 0.0);
+    FloatParamS modulation_level_leader("MOD", 0.0, 3.0, 0.0);
     ModulatableFloatParam<Modulator> modulatable_float_param(
         &modulator, modulation_level_leader, "", 0.0, 2.0, 0.0
     );
@@ -2004,12 +2286,12 @@ TEST(modulated_values_are_not_clamped, {
     modulation_level_leader.set_value(0.0);
     modulation_level_leader.schedule_value(2.0, modulation_level_value);
 
-    rendered_samples = FloatParam::produce< ModulatableFloatParam<Modulator> >(
+    rendered_samples = FloatParamS::produce< ModulatableFloatParam<Modulator> >(
         modulatable_float_param, 1
     );
     assert_eq(expected_samples[0], rendered_samples[0], block_size, DOUBLE_DELTA);
 
-    rendered_samples = FloatParam::produce< ModulatableFloatParam<Modulator> >(
+    rendered_samples = FloatParamS::produce< ModulatableFloatParam<Modulator> >(
         modulatable_float_param, 2
     );
     assert_eq(expected_samples[1], rendered_samples[0], block_size, DOUBLE_DELTA);
@@ -2026,7 +2308,7 @@ TEST(modulated_param_might_have_a_midi_controller_assigned, {
     };
 
     Modulator modulator;
-    FloatParam modulation_level_leader("MOD", 0.0, 3.0, 0.0);
+    FloatParamS modulation_level_leader("MOD", 0.0, 3.0, 0.0);
     ModulatableFloatParam<Modulator> modulatable_float_param(
         &modulator, modulation_level_leader, "", 0.0, 2.0, 0.0
     );
@@ -2045,13 +2327,13 @@ TEST(modulated_param_might_have_a_midi_controller_assigned, {
     midi_controller.change(0.1, 0.5);
 
     assert_false(modulatable_float_param.is_constant_in_next_round(1, block_size));
-    rendered_samples = FloatParam::produce< ModulatableFloatParam<Modulator> >(
+    rendered_samples = FloatParamS::produce< ModulatableFloatParam<Modulator> >(
         modulatable_float_param, 1
     );
     assert_eq(expected_samples[0], rendered_samples[0], block_size, DOUBLE_DELTA);
 
     assert_false(modulatable_float_param.is_constant_in_next_round(2, block_size));
-    rendered_samples = FloatParam::produce< ModulatableFloatParam<Modulator> >(
+    rendered_samples = FloatParamS::produce< ModulatableFloatParam<Modulator> >(
         modulatable_float_param, 2
     );
     assert_eq(expected_samples[1], rendered_samples[0], block_size, DOUBLE_DELTA);
@@ -2061,7 +2343,7 @@ TEST(modulated_param_might_have_a_midi_controller_assigned, {
 void set_up_chunk_size_independent_test(
         ModulatableFloatParam<Modulator> param,
         Modulator& modulator,
-        FloatParam& modulation_level_leader,
+        FloatParamS& modulation_level_leader,
         Integer const block_size,
         Frequency const sample_rate
 ) {
@@ -2083,8 +2365,8 @@ TEST(modulatable_param_rendering_is_independent_of_chunk_size, {
     constexpr Frequency sample_rate = 22050.0;
     Modulator modulator_1;
     Modulator modulator_2;
-    FloatParam modulation_level_1("MOD", 0.0, 1.0, 0.0);
-    FloatParam modulation_level_2("MOD", 0.0, 1.0, 0.0);
+    FloatParamS modulation_level_1("MOD", 0.0, 1.0, 0.0);
+    FloatParamS modulation_level_2("MOD", 0.0, 1.0, 0.0);
     ModulatableFloatParam<Modulator> param_1(
         &modulator_1, modulation_level_1, "", 0.0, 1.0, 0.0
     );
@@ -2102,4 +2384,122 @@ TEST(modulatable_param_rendering_is_independent_of_chunk_size, {
     assert_rendering_is_independent_from_chunk_size< ModulatableFloatParam<Modulator> >(
         param_1, param_2
     );
+})
+
+
+TEST(when_float_param_is_evaluated_once_per_rendering_block_then_still_applies_scheduled_changes, {
+    FloatParamB float_param("F", 0.0, 10.0, 1.0);
+
+    float_param.set_block_size(256);
+    float_param.set_sample_rate(100.0);
+
+    float_param.set_value(9.0);
+    float_param.schedule_value(2.0, 5.0);
+
+    assert_eq(NULL, FloatParamB::produce_if_not_constant(float_param, 1, 256));
+    assert_eq(5.0, float_param.get_value());
+})
+
+
+TEST(float_param_is_constant_after_assigning_midi_controller, {
+    constexpr Integer sample_count = 10;
+    constexpr Sample expected_samples[] = {
+        1.23, 1.23, 1.23, 1.23, 1.23,
+        1.23, 1.23, 1.23, 1.23, 1.23,
+    };
+    MidiController midi_controller;
+    FloatParamS float_param("F", 0.0, 10.0, 1.0);
+    Sample const* const* samples;
+
+    float_param.set_block_size(256);
+    float_param.set_sample_rate(200.0);
+
+    float_param.schedule_linear_ramp(1.0, 5.0);
+    FloatParamS::produce(float_param, 1, 1);
+    midi_controller.change(0.0, 0.123);
+    midi_controller.clear();
+
+    float_param.set_midi_controller(&midi_controller);
+    assert_true(float_param.is_constant_in_next_round(2, sample_count));
+
+    samples = FloatParamS::produce(float_param, 2, sample_count);
+
+    assert_eq(expected_samples, samples[0], sample_count);
+})
+
+
+TEST(float_param_is_constant_after_assigning_macro, {
+    constexpr Integer sample_count = 10;
+    constexpr Sample expected_samples[] = {
+        1.23, 1.23, 1.23, 1.23, 1.23,
+        1.23, 1.23, 1.23, 1.23, 1.23,
+    };
+    Macro macro;
+    FloatParamS float_param("F", 0.0, 10.0, 1.0);
+    Sample const* const* samples;
+
+    float_param.set_block_size(256);
+    float_param.set_sample_rate(200.0);
+
+    float_param.schedule_linear_ramp(1.0, 5.0);
+    FloatParamS::produce(float_param, 1, 1);
+    macro.input.set_value(0.123);
+
+    float_param.set_macro(&macro);
+    assert_true(float_param.is_constant_in_next_round(2, sample_count));
+
+    samples = FloatParamS::produce(float_param, 2, sample_count);
+
+    assert_eq(expected_samples, samples[0], sample_count, "macro");
+})
+
+
+template<class ParamClass>
+void test_midi_controller_assignment(ParamClass& param)
+{
+    MidiController midi_controller_1;
+    MidiController midi_controller_2;
+
+    param.set_midi_controller(&midi_controller_1);
+    assert_true(midi_controller_1.is_assigned());
+
+    param.set_midi_controller(&midi_controller_2);
+    assert_false(midi_controller_1.is_assigned());
+    assert_true(midi_controller_2.is_assigned());
+
+    param.set_midi_controller(NULL);
+    assert_false(midi_controller_2.is_assigned());
+}
+
+
+template<class ParamClass>
+void test_macro_assignment(ParamClass& param)
+{
+    Macro macro_1;
+    Macro macro_2;
+
+    param.set_macro(&macro_1);
+    assert_true(macro_1.is_assigned());
+
+    param.set_macro(&macro_2);
+    assert_false(macro_1.is_assigned());
+    assert_true(macro_2.is_assigned());
+
+    param.set_macro(NULL);
+    assert_false(macro_2.is_assigned());
+}
+
+
+TEST(when_a_midi_controller_is_assigned_to_a_param_or_released_from_it_then_the_midi_controller_is_notified, {
+    Param<int> int_param("int", 0, 10, 5);
+    FloatParamS float_param_s("float_param_s", 0.0, 1.0, 0.5);
+    FloatParamB float_param_b("float_param_b", 0.0, 1.0, 0.5);
+
+    test_midi_controller_assignment< Param<int> >(int_param);
+    test_midi_controller_assignment<FloatParamS>(float_param_s);
+    test_midi_controller_assignment<FloatParamB>(float_param_b);
+
+    test_macro_assignment< Param<int> >(int_param);
+    test_macro_assignment<FloatParamS>(float_param_s);
+    test_macro_assignment<FloatParamB>(float_param_b);
 })

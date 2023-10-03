@@ -42,7 +42,11 @@ class Buffer
             samples(NULL),
             append_index(0)
         {
-            samples = new Sample*[channels];
+            if (channels > 0) {
+                samples = new Sample*[channels];
+            } else {
+                samples = NULL;
+            }
 
             for (Integer channel = 0; channel != channels; ++channel) {
                 samples[channel] = new Sample[size];
@@ -55,6 +59,10 @@ class Buffer
 
         ~Buffer()
         {
+            if (samples == NULL) {
+                return;
+            }
+
             for (Integer channel = 0; channel != channels; ++channel) {
                 delete[] samples[channel];
             }
@@ -91,8 +99,8 @@ class Constant : public SignalProducer
     friend class SignalProducer;
 
     public:
-        Constant(Sample const value) noexcept
-            : SignalProducer(1, 0),
+        Constant(Sample const value, Integer const channels = 1) noexcept
+            : SignalProducer(channels, 0),
             value(value)
         {
         }
@@ -129,6 +137,11 @@ class FixedSignalProducer : public SignalProducer
             : SignalProducer(CHANNELS, 0),
             fixed_samples(fixed_samples)
         {
+        }
+
+        Integer get_cached_round() const noexcept
+        {
+            return this->cached_round;
         }
 
     protected:
@@ -195,12 +208,17 @@ class SumOfSines : public SignalProducer
                 Sample** buffer
         ) noexcept {
             Integer const channels = get_channels();
+
+            if (channels == 0) {
+                return;
+            }
+
             Seconds time = (
                 (Seconds)rendered_samples * sampling_period + phase_offset
             );
 
             for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-                Sample const sample = (Sample)(
+                buffer[0][i] = (Sample)(
                     amplitude_1 * Math::sin(
                         frequency_1_times_pi_double * time
                     )
@@ -212,11 +230,13 @@ class SumOfSines : public SignalProducer
                     )
                 ) + sample_offset;
 
-                for (Integer c = 0; c != channels; ++c) {
-                    buffer[c][i] = sample;
-                }
-
                 time += (Sample)sampling_period;
+            }
+
+            for (Integer c = 1; c != channels; ++c) {
+                for (Integer i = first_sample_index; i != last_sample_index; ++i) {
+                    buffer[c][i] = buffer[0][i];
+                }
             }
 
             rendered_samples += last_sample_index - first_sample_index;
@@ -268,7 +288,7 @@ void render_rounds(
  *
  * \warning The two signal chains must be identical, but they must not share any
  *          \c SignalProducer instances with each other, even if it would seem
- *          rational to do so (e.g. to use the same \c FloatParam leader
+ *          rational to do so (e.g. to use the same \c FloatParamS leader
  *          instance for both chains). The reason is that the two signal chains
  *          are rendered independently from each other, so their rendering
  *          rounds are not synchronized to each other.

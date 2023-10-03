@@ -20,6 +20,7 @@
 #define JS80P__DSP__PARAM_HPP
 
 #include <string>
+#include <type_traits>
 
 #include "js80p.hpp"
 
@@ -33,17 +34,24 @@ namespace JS80P
 class Envelope;
 
 
-class FlexibleController;
+class Macro;
 
 
 class LFO;
+
+
+enum ParamEvaluation
+{
+    BLOCK = 0,  ///< The parameter is evaluated once at the beginning of each rendering block
+    SAMPLE = 1, ///< The parameter is evaluated for each rendered sample
+};
 
 
 /**
  * \brief A variable that can influence the synthesized sound or other
  *        parameters.
  */
-template<typename NumberType>
+template<typename NumberType, ParamEvaluation evaluation = ParamEvaluation::SAMPLE>
 class Param : public SignalProducer
 {
     friend class SignalProducer;
@@ -56,6 +64,7 @@ class Param : public SignalProducer
             NumberType const default_value
         ) noexcept;
 
+        ParamEvaluation get_evaluation() const noexcept;
         std::string const& get_name() const noexcept;
         NumberType get_default_value() const noexcept;
         NumberType get_value() const noexcept;
@@ -70,8 +79,11 @@ class Param : public SignalProducer
         NumberType ratio_to_value(Number const ratio) const noexcept;
         Number value_to_ratio(NumberType const value) const noexcept;
 
-        void set_midi_controller(MidiController const* midi_controller) noexcept;
-        MidiController const* get_midi_controller() const noexcept;
+        void set_midi_controller(MidiController* midi_controller) noexcept;
+        MidiController* get_midi_controller() const noexcept;
+
+        void set_macro(Macro* macro) noexcept;
+        Macro* get_macro() const noexcept;
 
         /**
          * \brief Whenever the value of the parameter changes, the change index
@@ -82,6 +94,15 @@ class Param : public SignalProducer
         Integer get_change_index() const noexcept;
 
     protected:
+        template<class ParamClass>
+        static void set_midi_controller(
+            ParamClass& param,
+            MidiController* midi_controller
+        ) noexcept;
+
+        template<class ParamClass>
+        static void set_macro(ParamClass& param, Macro* macro) noexcept;
+
         NumberType get_raw_value() const noexcept;
 
         void render(
@@ -94,7 +115,11 @@ class Param : public SignalProducer
         NumberType clamp(NumberType const value) const noexcept;
         void store_new_value(NumberType const new_value) noexcept;
 
-        MidiController const* midi_controller;
+        MidiController* midi_controller;
+
+        Macro* macro;
+        Integer macro_change_index;
+
         std::string const name;
         NumberType const min_value;
         NumberType const max_value;
@@ -111,7 +136,7 @@ class Param : public SignalProducer
 typedef Byte Toggle;
 
 
-class ToggleParam : public Param<Toggle>
+class ToggleParam : public Param<Toggle, ParamEvaluation::BLOCK>
 {
     friend class SignalProducer;
 
@@ -123,21 +148,31 @@ class ToggleParam : public Param<Toggle>
 };
 
 
+template<ParamEvaluation evaluation>
+class FloatParam;
+
+
+typedef FloatParam<ParamEvaluation::SAMPLE> FloatParamS;
+typedef FloatParam<ParamEvaluation::BLOCK> FloatParamB;
+
+
 /**
  * \brief Parameter with floating point values. Values can be scheduled at
  *        time offsets, or can be approached linearly over a given duration of
  *        time.
  */
-class FloatParam : public Param<Number>
+template<ParamEvaluation evaluation>
+class FloatParam : public Param<Number, evaluation>
 {
     friend class SignalProducer;
 
     public:
-        static constexpr Event::Type EVT_SET_VALUE = 1;
-        static constexpr Event::Type EVT_LINEAR_RAMP = 2;
-        static constexpr Event::Type EVT_LOG_RAMP = 3;
-        static constexpr Event::Type EVT_ENVELOPE_START = 4;
-        static constexpr Event::Type EVT_ENVELOPE_END = 5;
+        static constexpr SignalProducer::Event::Type EVT_SET_VALUE = 1;
+        static constexpr SignalProducer::Event::Type EVT_LINEAR_RAMP = 2;
+        static constexpr SignalProducer::Event::Type EVT_LOG_RAMP = 3;
+        static constexpr SignalProducer::Event::Type EVT_ENVELOPE_START = 4;
+        static constexpr SignalProducer::Event::Type EVT_ENVELOPE_END = 5;
+        static constexpr SignalProducer::Event::Type EVT_ENVELOPE_CANCEL = 6;
 
         /*
         Some MIDI controllers seem to send multiple changes of the same value with
@@ -164,20 +199,20 @@ class FloatParam : public Param<Number>
         /**
          * \brief Render the single channel of the parameter if it has scheduled
          *        changes during this round, but if the parameter is constant
-         *        during the round, then skip this round for it and return
-         *        \c NULL. A shortcut for the following construct:
+         *        during the round, then return \c NULL. A shortcut for the
+         *        following construct:
          *
          *        \code{.cpp}
          *        if (param.is_constant_in_next_round(round, sample_count) {
          *            param.skip_round(round, sample_count);
          *        } else {
-         *            param_buffer = FloatParam::produce<FloatParam>(
+         *            param_buffer = FloatParamS::produce<FloatParamS>(
          *                param, round, sample_count
          *            )[0];
          *        }
          *        \endcode
          */
-        template<class FloatParamClass = FloatParam>
+        template<class FloatParamClass = FloatParam<ParamEvaluation::SAMPLE> >
         static Sample const* produce_if_not_constant(
             FloatParamClass& float_param,
             Integer const round,
@@ -192,18 +227,17 @@ class FloatParam : public Param<Number>
             Number const round_to = 0.0,
             ToggleParam const* log_scale_toggle = NULL,
             Number const* log_scale_table = NULL,
-            Number const* log_scale_inv_table = NULL,
             int const log_scale_table_max_index = 0,
-            Number const log_scale_table_scale = 0.0,
-            Number const log_scale_inv_table_scale = 0.0
+            Number const log_scale_table_scale = 0.0
         ) noexcept;
 
         /**
          * \warning When the leader needs to be rendered, it will be rendered as
-         *          a \c FloatParam, even if it's a descendant. Practically,
-         *          this means that only \c FloatParam objects can be leaders.
+         *          a \c FloatParam<evaluation>, even if it's a descendant.
+         *          Practically, this means that only \c FloatParam objects can
+         *          be leaders.
          */
-        FloatParam(FloatParam& leader) noexcept;
+        FloatParam(FloatParam<evaluation>& leader) noexcept;
 
         bool is_logarithmic() const noexcept;
 
@@ -212,6 +246,10 @@ class FloatParam : public Param<Number>
         void set_ratio(Number const ratio) noexcept;
         Number get_ratio() const noexcept;
         Number get_default_ratio() const noexcept;
+        ToggleParam const* get_log_scale_toggle() const noexcept;
+        Number const* get_log_scale_table() const noexcept;
+        int get_log_scale_table_max_index() const noexcept;
+        Number get_log_scale_table_scale() const noexcept;
 
         Number ratio_to_value(Number const ratio) const noexcept;
         Number value_to_ratio(Number const value) const noexcept;
@@ -236,18 +274,15 @@ class FloatParam : public Param<Number>
             Number const target_value
         ) noexcept;
 
-        void set_midi_controller(MidiController const* midi_controller) noexcept;
-
-        void set_flexible_controller(
-            FlexibleController* flexible_controller
-        ) noexcept;
-
-        FlexibleController const* get_flexible_controller() const noexcept;
+        void set_midi_controller(MidiController* midi_controller) noexcept;
+        void set_macro(Macro* macro) noexcept;
 
         void set_envelope(Envelope* const envelope) noexcept;
         Envelope* get_envelope() const noexcept;
         void start_envelope(Seconds const time_offset) noexcept;
         Seconds end_envelope(Seconds const time_offset) noexcept;
+        void cancel_envelope(Seconds const time_offset, Seconds const duration) noexcept;
+        void update_envelope(Seconds const time_offset) noexcept;
 
         void set_lfo(LFO* lfo) noexcept;
         LFO const* get_lfo() const noexcept;
@@ -265,7 +300,7 @@ class FloatParam : public Param<Number>
             Sample** buffer
         ) noexcept;
 
-        void handle_event(Event const& event) noexcept;
+        void handle_event(SignalProducer::Event const& event) noexcept;
 
     private:
         enum EnvelopeStage {
@@ -289,7 +324,7 @@ class FloatParam : public Param<Number>
                     bool const is_logarithmic
                 ) noexcept;
 
-                Number get_next_value() noexcept;
+                Number advance() noexcept;
                 Number get_value_at(Seconds const time_offset) const noexcept;
 
                 Seconds start_time_offset;
@@ -305,13 +340,16 @@ class FloatParam : public Param<Number>
         };
 
         Number round_value(Number const value) const noexcept;
+        Number ratio_to_value_log(Number const ratio) const noexcept;
+        Number ratio_to_value_raw(Number const ratio) const noexcept;
 
-        void handle_set_value_event(Event const& event) noexcept;
-        void handle_linear_ramp_event(Event const& event) noexcept;
-        void handle_log_ramp_event(Event const& event) noexcept;
-        void handle_envelope_start_event(Event const& event) noexcept;
-        void handle_envelope_end_event(Event const& event) noexcept;
-        void handle_cancel_event(Event const& event) noexcept;
+        void handle_cancel_event(SignalProducer::Event const& event) noexcept;
+        void handle_set_value_event(SignalProducer::Event const& event) noexcept;
+        void handle_linear_ramp_event(SignalProducer::Event const& event) noexcept;
+        void handle_log_ramp_event(SignalProducer::Event const& event) noexcept;
+        void handle_envelope_start_event(SignalProducer::Event const& event) noexcept;
+        void handle_envelope_end_event() noexcept;
+        void handle_envelope_cancel_event() noexcept;
 
         bool is_following_leader() const noexcept;
 
@@ -320,11 +358,10 @@ class FloatParam : public Param<Number>
             Integer const sample_count
         ) noexcept;
 
+        template<bool is_logarithmic_>
         Sample const* const* process_midi_controller_events() noexcept;
 
-        Sample const* const* process_flexible_controller(
-            Integer const sample_count
-        ) noexcept;
+        Sample const* const* process_macro(Integer const sample_count) noexcept;
 
         Seconds smooth_change_duration(
             Number const previous_value,
@@ -332,30 +369,48 @@ class FloatParam : public Param<Number>
             Seconds const duration
         ) const noexcept;
 
-        Sample const* const* process_envelope(
-            Envelope* const envelope
+        void process_envelope(Envelope& envelope, Seconds const time_offset = 0.0) noexcept;
+
+        void render_with_lfo(
+            Integer const round,
+            Integer const first_sample_index,
+            Integer const last_sample_index,
+            Sample** buffer
+        ) noexcept;
+
+        void render_linear_ramp(
+            Integer const round,
+            Integer const first_sample_index,
+            Integer const last_sample_index,
+            Sample** buffer
+        ) noexcept;
+
+        void advance_envelope(
+                Integer const first_sample_index,
+                Integer const last_sample_index
         ) noexcept;
 
         Seconds schedule_envelope_value_if_not_reached(
             Seconds const next_event_time_offset,
-            FloatParam const& time_param,
-            FloatParam const& value_param,
+            FloatParamB const& time_param,
+            FloatParamB const& value_param,
             Number const amount
         ) noexcept;
 
-        void update_envelope();
+        template<SignalProducer::Event::Type event>
+        Seconds end_envelope(
+            Seconds const time_offset,
+            Seconds const duration = 0.0
+        ) noexcept;
 
         ToggleParam const* const log_scale_toggle;
         Number const* const log_scale_table;
-        Number const* const log_scale_inv_table;
         int const log_scale_table_max_index;
         Number const log_scale_table_scale;
-        Number const log_scale_inv_table_scale;
+        Number const log_min_minus;
+        Number const log_range_inv;
 
-        FloatParam* const leader;
-
-        FlexibleController* flexible_controller;
-        Integer flexible_controller_change_index;
+        FloatParam<evaluation>* const leader;
 
         LFO* lfo;
         Sample const* const* lfo_buffer;
@@ -365,8 +420,11 @@ class FloatParam : public Param<Number>
         Seconds envelope_end_time_offset;
         Seconds envelope_position;
         Seconds envelope_release_time;
+        Seconds envelope_cancel_duration;
+        Number envelope_final_value;
         EnvelopeStage envelope_stage;
         bool envelope_end_scheduled;
+        bool envelope_canceled;
 
         bool const should_round;
         bool const is_ratio_same_as_value;
@@ -376,7 +434,7 @@ class FloatParam : public Param<Number>
         LinearRampState linear_ramp_state;
         Integer constantness_round;
         bool constantness;
-        Event::Type latest_event_type;
+        SignalProducer::Event::Type latest_event_type;
 };
 
 
@@ -385,7 +443,7 @@ class FloatParam : public Param<Number>
  *        \c SignalProducer objects.
  */
 template<class ModulatorSignalProducerClass>
-class ModulatableFloatParam : public FloatParam
+class ModulatableFloatParam : public FloatParamS
 {
     friend class SignalProducer;
 
@@ -393,15 +451,15 @@ class ModulatableFloatParam : public FloatParam
         static constexpr Number MODULATION_LEVEL_INSIGNIFICANT = 0.000001;
 
         ModulatableFloatParam(
-            ModulatorSignalProducerClass* modulator,
-            FloatParam& modulation_level_leader,
+            ModulatorSignalProducerClass* const modulator,
+            FloatParamS& modulation_level_leader,
             std::string const name = "",
             Number const min_value = -1.0,
             Number const max_value = 1.0,
             Number const default_value = 0.0
         ) noexcept;
 
-        ModulatableFloatParam(FloatParam& leader) noexcept;
+        ModulatableFloatParam(FloatParamS& leader) noexcept;
 
         bool is_constant_in_next_round(
             Integer const round, Integer const sample_count
@@ -411,6 +469,8 @@ class ModulatableFloatParam : public FloatParam
 
         void start_envelope(Seconds const time_offset) noexcept;
         Seconds end_envelope(Seconds const time_offset) noexcept;
+        void cancel_envelope(Seconds const time_offset, Seconds const duration) noexcept;
+        void update_envelope(Seconds const time_offset) noexcept;
 
     protected:
         Sample const* const* initialize_rendering(
@@ -426,8 +486,8 @@ class ModulatableFloatParam : public FloatParam
         ) noexcept;
 
     private:
-        FloatParam modulation_level;
-        ModulatorSignalProducerClass* modulator;
+        FloatParamS modulation_level;
+        ModulatorSignalProducerClass* const modulator;
         Sample const* modulator_buffer;
         Sample const* modulation_level_buffer;
         bool modulation_level_is_constant;

@@ -20,7 +20,6 @@
 #define JS80P__DSP__SIGNAL_PRODUCER_CPP
 
 #include <algorithm>
-#include <cmath>
 
 #include "dsp/signal_producer.hpp"
 
@@ -34,10 +33,6 @@ Sample const* const* SignalProducer::produce(
         Integer const round,
         Integer const sample_count
 ) noexcept {
-    if (UNLIKELY(signal_producer.channels == 0)) {
-        return NULL;
-    }
-
     if (signal_producer.cached_round == round) {
         return signal_producer.cached_buffer;
     }
@@ -81,11 +76,36 @@ Sample const* const* SignalProducer::produce(
         );
     }
 
+    signal_producer.finalize_rendering(round, count);
+
     if (signal_producer.events.is_empty()) {
         signal_producer.current_time = 0.0;
     }
 
     return buffer;
+}
+
+
+void SignalProducer::find_peak(
+        Sample const* const* samples,
+        Integer const channels,
+        Integer const size,
+        Sample& peak,
+        Integer& peak_index
+) noexcept {
+    peak = 0.0;
+    peak_index = 0;
+
+    for (Integer c = 0; c != channels; ++c) {
+        for (Integer i = 0; i != size; ++i) {
+            Sample const sample = std::fabs(samples[c][i]);
+
+            if (sample >= peak) {
+                peak = sample;
+                peak_index = i;
+            }
+        }
+    }
 }
 
 
@@ -103,7 +123,9 @@ SignalProducer::SignalProducer(
     bpm(DEFAULT_BPM),
     current_time(0.0),
     cached_round(-1),
-    cached_buffer(NULL)
+    cached_buffer(NULL),
+    cached_silence_round(-1),
+    cached_silence(false)
 {
     children.reserve(number_of_children);
 
@@ -215,6 +237,8 @@ void SignalProducer::reset() noexcept
     for (Children::iterator it = children.begin(); it != children.end(); ++it) {
         (*it)->reset();
     }
+
+    cached_round = -1;
 }
 
 
@@ -237,6 +261,43 @@ void SignalProducer::set_bpm(Number const new_bpm) noexcept
 Number SignalProducer::get_bpm() const noexcept
 {
     return bpm;
+}
+
+
+bool SignalProducer::is_silent(
+        Integer const round,
+        Integer const sample_count
+) noexcept {
+    if (cached_buffer == NULL) {
+        return true;
+    }
+
+    if (round == cached_silence_round) {
+        return cached_silence;
+    }
+
+    cached_silence_round = round;
+
+    for (Integer c = 0; c != channels; ++c) {
+        for (Integer i = 0; i != sample_count; ++i) {
+            if (std::fabs(cached_buffer[c][i]) > SILENCE_THRESHOLD) {
+                cached_silence = false;
+
+                return false;
+            }
+        }
+    }
+
+    cached_silence = true;
+
+    return true;
+}
+
+
+void SignalProducer::mark_round_as_silent(Integer const round) noexcept
+{
+    cached_silence_round = round;
+    cached_silence = true;
 }
 
 
@@ -290,12 +351,27 @@ void SignalProducer::cancel_events() noexcept
 }
 
 
-void SignalProducer::cancel_events(Seconds const time_offset) noexcept
+void SignalProducer::cancel_events_at(Seconds const time_offset) noexcept
 {
     Seconds const time = time_offset + current_time;
 
     for (Queue<Event>::SizeType i = 0, l = events.length(); i != l; ++i) {
         if (events[i].time_offset >= time) {
+            events.drop(i);
+            break;
+        }
+    }
+
+    schedule(EVT_CANCEL, time_offset);
+}
+
+
+void SignalProducer::cancel_events_after(Seconds const time_offset) noexcept
+{
+    Seconds const time = time_offset + current_time;
+
+    for (Queue<Event>::SizeType i = 0, l = events.length(); i != l; ++i) {
+        if (events[i].time_offset > time) {
             events.drop(i);
             break;
         }
@@ -330,6 +406,13 @@ void SignalProducer::render(
         Integer const first_sample_index,
         Integer const last_sample_index,
         Sample** buffer
+) noexcept {
+}
+
+
+void SignalProducer::finalize_rendering(
+        Integer const round,
+        Integer const sample_count
 ) noexcept {
 }
 
@@ -396,16 +479,6 @@ SignalProducer::Event::Event(Type const type) noexcept
 }
 
 
-SignalProducer::Event::Event(Event const& event) noexcept
-    : time_offset(event.time_offset),
-    int_param(event.int_param),
-    number_param_1(event.number_param_1),
-    number_param_2(event.number_param_2),
-    type(event.type)
-{
-}
-
-
 SignalProducer::Event::Event(
         Type const type,
         Seconds const time_offset,
@@ -419,20 +492,6 @@ SignalProducer::Event::Event(
     number_param_2(number_param_2),
     type(type)
 {
-}
-
-
-SignalProducer::Event& SignalProducer::Event::operator=(Event const& event) noexcept
-{
-    if (this != &event) {
-        type = event.type;
-        time_offset = event.time_offset;
-        int_param = event.int_param;
-        number_param_1 = event.number_param_1;
-        number_param_2 = event.number_param_2;
-    }
-
-    return *this;
 }
 
 

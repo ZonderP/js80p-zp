@@ -28,12 +28,27 @@ namespace JS80P
 template<class InputSignalProducerClass>
 Gain<InputSignalProducerClass>::Gain(
         InputSignalProducerClass& input,
-        FloatParam& gain
+        FloatParamS& gain
 ) noexcept
     : Filter<InputSignalProducerClass>(input),
     gain_buffer(NULL),
     gain(gain)
 {
+}
+
+
+template<class InputSignalProducerClass>
+void Gain<InputSignalProducerClass>::find_input_peak(
+        Integer const round,
+        Integer const sample_count,
+        Sample& peak,
+        Integer& peak_index
+) const noexcept {
+    Sample const* const* const input_buffer = SignalProducer::produce<InputSignalProducerClass>(
+        this->input, round, sample_count
+    );
+
+    SignalProducer::find_peak(input_buffer, this->channels, sample_count, peak, peak_index);
 }
 
 
@@ -45,7 +60,7 @@ Sample const* const* Gain<InputSignalProducerClass>::initialize_rendering(
     Sample const* const* const input_buffer = (
         Filter<InputSignalProducerClass>::initialize_rendering(round, sample_count)
     );
-    gain_buffer = FloatParam::produce_if_not_constant(gain, round, sample_count);
+    gain_buffer = FloatParamS::produce_if_not_constant(gain, round, sample_count);
 
     if (gain_buffer == NULL && std::fabs(1.0 - gain.get_value()) < 0.000001) {
         return input_buffer;

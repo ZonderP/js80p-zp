@@ -19,6 +19,7 @@
 #ifndef JS80P__DSP__SIGNAL_PRODUCER_HPP
 #define JS80P__DSP__SIGNAL_PRODUCER_HPP
 
+#include <cmath>
 #include <vector>
 
 #include "js80p.hpp"
@@ -41,7 +42,9 @@ class SignalProducer
                 typedef Byte Type;
 
                 Event(Type const type) noexcept;
-                Event(Event const& event) noexcept;
+                Event(Event const& event) noexcept = default;
+                Event(Event&& event) noexcept = default;
+
                 Event(
                     Type const type,
                     Seconds const time_offset,
@@ -50,7 +53,8 @@ class SignalProducer
                     Number const number_param_2 = 0.0
                 ) noexcept;
 
-                Event& operator=(Event const& event) noexcept;
+                Event& operator=(Event const& event) noexcept = default;
+                Event& operator=(Event&& event) noexcept = default;
 
                 Seconds time_offset;
                 Integer int_param;
@@ -61,6 +65,11 @@ class SignalProducer
 
         static constexpr Integer DEFAULT_BLOCK_SIZE = 128;
         static constexpr Frequency DEFAULT_SAMPLE_RATE = 44100.0;
+
+        static constexpr Number SILENCE_THRESHOLD_DB = -150.0;
+        static constexpr Number SILENCE_THRESHOLD = (
+            std::exp(SILENCE_THRESHOLD_DB * std::log(2) / 6.0)
+        );
 
         /*
         Default to 60, so that 1 beat = 1 second, so when no BPM info is
@@ -102,6 +111,14 @@ class SignalProducer
             Integer const sample_count = -1
         ) noexcept;
 
+        static void find_peak(
+            Sample const* const* samples,
+            Integer const channels,
+            Integer const size,
+            Sample& peak,
+            Integer& peak_index
+        ) noexcept;
+
         SignalProducer(
             Integer const channels,
             Integer const number_of_children = 0
@@ -122,6 +139,10 @@ class SignalProducer
         void set_bpm(Number const new_bpm) noexcept;
         Number get_bpm() const noexcept;
 
+        bool is_silent(
+            Integer const round,
+            Integer const sample_count = -1
+        ) noexcept;
 
         Sample const* const* get_last_rendered_block(
             Integer& sample_count
@@ -144,7 +165,8 @@ class SignalProducer
         ) noexcept;
 
         void cancel_events() noexcept;
-        void cancel_events(Seconds const time_offset) noexcept;
+        void cancel_events_at(Seconds const time_offset) noexcept;
+        void cancel_events_after(Seconds const time_offset) noexcept;
         bool has_events_after(Seconds const time_offset) const noexcept;
         Seconds get_last_event_time_offset() const noexcept;
 
@@ -172,6 +194,14 @@ class SignalProducer
         ) noexcept;
 
         /**
+         * \brief Implement final housekeeping after rendering in this method.
+         */
+        void finalize_rendering(
+            Integer const round,
+            Integer const sample_count
+        ) noexcept;
+
+        /**
          * \brief Implement handling events in this method.
          */
         void handle_event(Event const& event) noexcept;
@@ -186,6 +216,8 @@ class SignalProducer
             Integer const last_sample_index,
             Sample** buffer
         ) noexcept;
+
+        void mark_round_as_silent(Integer const round) noexcept;
 
         bool has_upcoming_events(Integer const sample_count) const noexcept;
 
@@ -226,6 +258,8 @@ class SignalProducer
         ) noexcept;
 
         Children children;
+        Integer cached_silence_round;
+        bool cached_silence;
 };
 
 }

@@ -19,6 +19,7 @@
 #ifndef JS80P__DSP__MIXER_HPP
 #define JS80P__DSP__MIXER_HPP
 
+#include <cstddef>
 #include <vector>
 
 #include "js80p.hpp"
@@ -38,6 +39,7 @@ class Mixer : public SignalProducer
         Mixer(Integer const channels) noexcept;
 
         void add(InputSignalProducerClass& input) noexcept;
+        void set_weight(size_t const input_index, Number const weight) noexcept;
         void set_output_buffer(Sample** output) noexcept;
 
     protected:
@@ -57,18 +59,30 @@ class Mixer : public SignalProducer
         class Input {
             public:
                 Input(InputSignalProducerClass* input);
-                Input(Input const& input);
-                Input(Input const&& input);
+                Input(Input const& input) = default;
+                Input(Input&& input) = default;
 
-                Input& operator=(Input const& input);
-                Input& operator=(Input const&& input);
+                Input& operator=(Input const& input) = default;
+                Input& operator=(Input&& input) = default;
 
                 InputSignalProducerClass* input;
                 Sample const* const* buffer;
+                Number weight;
         };
+
+        static constexpr Number SILENCE_WEIGHT = 0.000001;
+
+        template<bool has_weights>
+        void render(
+            Integer const round,
+            Integer const first_sample_index,
+            Integer const last_sample_index,
+            Sample** buffer
+        ) noexcept;
 
         Sample** output;
         std::vector<Input> inputs;
+        bool has_weights;
 };
 
 }

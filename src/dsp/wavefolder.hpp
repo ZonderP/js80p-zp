@@ -22,6 +22,7 @@
 #include "js80p.hpp"
 
 #include "dsp/filter.hpp"
+#include "dsp/math.hpp"
 #include "dsp/param.hpp"
 #include "dsp/signal_producer.hpp"
 
@@ -34,7 +35,10 @@ namespace JS80P
  *        Antialiasing (ADAA). See:
  *        <a href="https://www.dafx.de/paper-archive/2016/dafxpapers/20-DAFx-16_paper_41-PN.pdf">
  *        Reducing the Aliasing of Nonlinear Waveshaping Using Continuous-Time Convolution
- *        (Parker, J., Zavalishin, V., & Bivic, E.L. - 2016)</a>.
+ *        (Parker, J., Zavalishin, V., & Bivic, E.L. - 2016)</a>. The shaping
+ *        function is an approximation of a triangle wave which has a wavelength
+ *        of 4.0, and which is positioned so that f(0.0) = 0.0, and the
+ *        projection of the [-1.0, 1.0] interval is approximately itself.
  */
 template<class InputSignalProducerClass>
 class Wavefolder : public Filter<InputSignalProducerClass>
@@ -45,13 +49,13 @@ class Wavefolder : public Filter<InputSignalProducerClass>
         Wavefolder(InputSignalProducerClass& input) noexcept;
         Wavefolder(
             InputSignalProducerClass& input,
-            FloatParam& folding_leader
+            FloatParamS& folding_leader
         ) noexcept;
         ~Wavefolder();
 
         virtual void reset() noexcept override;
 
-        FloatParam folding;
+        FloatParamS folding;
 
     protected:
         Sample const* const* initialize_rendering(
@@ -83,12 +87,31 @@ class Wavefolder : public Filter<InputSignalProducerClass>
         static constexpr Sample S8 = TRIANGLE_SCALE / (125.0 * Math::PI);
 
         /*
+        The table contains a whole period of the triangle wave function for the
+        [-2.0, 2.0] interval.
+        */
+        static constexpr int TABLE_SIZE = Math::SIN_TABLE_SIZE;
+        static constexpr int TABLE_MASK = Math::SIN_TABLE_MASK;
+        static constexpr Number TABLE_SIZE_FLOAT = (Number)TABLE_SIZE;
+        static constexpr Number TABLE_SIZE_FLOAT_INV = 1.0 / TABLE_SIZE_FLOAT;
+        static constexpr Number WAVE_LENGTH = Math::PI_DOUBLE / S1;
+        static constexpr Number WAVE_LENGTH_HALF = WAVE_LENGTH / 2.0;
+        static constexpr Number TABLE_SCALE = TABLE_SIZE_FLOAT / WAVE_LENGTH;
+        static constexpr Number TABLE_OFFSET = TABLE_SIZE_FLOAT / WAVE_LENGTH_HALF;
+
+        /*
         The trigonometric functions in the Math class handle positive numbers
         better, so we shift everything by a few periods.
         */
         static constexpr Sample TRIG_OFFSET = (
             Math::PI_DOUBLE * std::ceil(Constants::FOLD_MAX * S5)
         );
+
+        // static Sample f_table[TABLE_SIZE];
+        static Sample F0_table[TABLE_SIZE];
+        static bool is_initialized;
+
+        static void initialize_class() noexcept;
 
         void initialize_instance() noexcept;
 
@@ -100,7 +123,7 @@ class Wavefolder : public Filter<InputSignalProducerClass>
             Sample& previous_output_sample
         ) noexcept;
 
-        Sample f(Sample const x) const noexcept;
+        // Sample f(Sample const x) const noexcept;
         Sample F0(Sample const x) const noexcept;
 
         Sample const* folding_buffer;

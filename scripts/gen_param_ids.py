@@ -11,7 +11,7 @@ def main(argv):
     param_id = print_oscillator_params(param_id, "Modulator", "M")
     param_id = print_oscillator_params(param_id, "Carrier", "C")
     param_id = print_effect_params(param_id)
-    param_id = print_flexible_controllers_params(param_id)
+    param_id = print_macros(param_id)
     param_id = print_envelopes_params(param_id)
     param_id = print_lfo_params(param_id)
     param_id = print_special_params(param_id)
@@ -70,6 +70,8 @@ def print_oscillator_params(param_id: int, group: str, prefix: str) -> int:
 
 def print_effect_params(param_id: int) -> int:
     params = [
+        ("$V1V", "  ///< $ Volume 1"),
+
         ("$OG", "   ///< $ Overdrive Gain"),
 
         ("$DG", "   ///< $ Distortion Gain"),
@@ -81,6 +83,8 @@ def print_effect_params(param_id: int) -> int:
         ("$F2FRQ", "///< $ Filter 2 Frequency"),
         ("$F2Q", "  ///< $ Filter 2 Q Factor"),
         ("$F2G", "  ///< $ Filter 2 Gain"),
+
+        ("$V2V", "  ///< $ Volume 2"),
 
         ("$CDEL", " ///< $ Chorus Delay"),
         ("$CFRQ", " ///< $ Chorus LFO Frequency"),
@@ -99,6 +103,10 @@ def print_effect_params(param_id: int) -> int:
         ("$EDG", "  ///< $ Echo Dampening Gain"),
         ("$EWID", " ///< $ Echo Stereo Width"),
         ("$EHPF", " ///< $ Echo Highpass Frequency"),
+        ("$ECTH", " ///< $ Echo Side-Chain Compression Threshold"),
+        ("$ECAT", " ///< $ Echo Side-Chain Compression Attack Time"),
+        ("$ECRL", " ///< $ Echo Side-Chain Compression Release Time"),
+        ("$ECR", "  ///< $ Echo Side-Chain Compression Ratio"),
         ("$EWET", " ///< $ Echo Wet Volume"),
         ("$EDRY", " ///< $ Echo Dry Volume"),
 
@@ -107,14 +115,20 @@ def print_effect_params(param_id: int) -> int:
         ("$RDG", "  ///< $ Reverb Dampening Gain"),
         ("$RWID", " ///< $ Reverb Stereo Width"),
         ("$RHPF", " ///< $ Reverb Highpass Frequency"),
+        ("$RCTH", " ///< $ Reverb Side-Chain Compression Threshold"),
+        ("$RCAT", " ///< $ Reverb Side-Chain Compression Attack Time"),
+        ("$RCRL", " ///< $ Reverb Side-Chain Compression Release Time"),
+        ("$RCR", "  ///< $ Reverb Side-Chain Compression Ratio"),
         ("$RWET", " ///< $ Reverb Wet Volume"),
         ("$RDRY", " ///< $ Reverb Dry Volume"),
+
+        ("$V3V", "  ///< $ Volume 3"),
     ]
 
     return print_params(param_id, "Effects", "E", 1, params)
 
 
-def print_flexible_controllers_params(param_id: int) -> int:
+def print_macros(param_id: int) -> int:
     params = [
         ("$#IN", "  ///< $ # Input"),
         ("$#MIN", " ///< $ # Minimum Value"),
@@ -124,7 +138,7 @@ def print_flexible_controllers_params(param_id: int) -> int:
         ("$#RND", " ///< $ # Randomness"),
     ]
 
-    return print_params(param_id, "Flexible Controller", "F", 20, params)
+    return print_params(param_id, "Macro", "M", 20, params)
 
 
 def print_envelopes_params(param_id: int) -> int:
@@ -218,6 +232,12 @@ def print_special_params(param_id: int) -> int:
         ("N4DYN", " ///< Envelope 4 Dynamic"),
         ("N5DYN", " ///< Envelope 5 Dynamic"),
         ("N6DYN", " ///< Envelope 6 Dynamic"),
+
+        ("POLY", "  ///< Polyphonic"),
+
+        ("ERTYP", " ///< Effects Reverb Type"),
+
+        ("ECTYP", " ///< Effects Chorus Type"),
     ]
 
     return print_params(param_id, "", "", 1, params)

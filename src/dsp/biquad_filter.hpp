@@ -71,7 +71,7 @@ class BiquadFilter : public Filter<InputSignalProducerClass>
         static constexpr Type LOW_SHELF = 5;
         static constexpr Type HIGH_SHELF = 6;
 
-        class TypeParam : public Param<Type>
+        class TypeParam : public Param<Type, ParamEvaluation::BLOCK>
         {
             public:
                 TypeParam(std::string const name) noexcept;
@@ -94,9 +94,9 @@ class BiquadFilter : public Filter<InputSignalProducerClass>
         BiquadFilter(
             InputSignalProducerClass& input,
             TypeParam& type,
-            FloatParam& frequency_leader,
-            FloatParam& q_leader,
-            FloatParam& gain_leader,
+            FloatParamS& frequency_leader,
+            FloatParamS& q_leader,
+            FloatParamS& gain_leader,
             BiquadFilterSharedCache* shared_cache = NULL
         ) noexcept;
 
@@ -108,9 +108,11 @@ class BiquadFilter : public Filter<InputSignalProducerClass>
 
         virtual void reset() noexcept override;
 
-        FloatParam frequency;
-        FloatParam q;
-        FloatParam gain;
+        void set_shared_cache(BiquadFilterSharedCache* shared_cache) noexcept;
+
+        FloatParamS frequency;
+        FloatParamS q;
+        FloatParamS gain;
         TypeParam& type;
 
     protected:
@@ -127,7 +129,6 @@ class BiquadFilter : public Filter<InputSignalProducerClass>
         ) noexcept;
 
     private:
-        static constexpr Number DB_TO_LINEAR_GAIN_SCALE = 1.0 / 20.0;
         static constexpr Number FREQUENCY_SINE_SCALE = std::sqrt(2.0);
         static constexpr Number GAIN_SCALE_HALF = (
             Constants::BIQUAD_FILTER_GAIN_SCALE / 2.0
@@ -141,6 +142,17 @@ class BiquadFilter : public Filter<InputSignalProducerClass>
         void reallocate_buffers() noexcept;
         void allocate_buffers() noexcept;
         void free_buffers() noexcept;
+
+        Sample const* const* initialize_rendering_no_op(
+            Integer const round,
+            Integer const sample_count
+        ) noexcept;
+
+        void update_state_for_no_op_round(Integer const sample_count) noexcept;
+        void update_state_for_silent_round(
+            Integer const round,
+            Integer const sample_count
+        ) noexcept;
 
         Sample const* const* initialize_rendering_with_shared_coefficients(
             Integer const round,
@@ -258,7 +270,7 @@ class BiquadFilter : public Filter<InputSignalProducerClass>
 
         Number low_pass_no_op_frequency;
 
-        bool is_silent;
+        bool is_silent_;
         bool are_coefficients_constant;
         bool can_use_shared_coefficients;
 };

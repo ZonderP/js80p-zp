@@ -24,7 +24,6 @@ vst3moduleinfo: $(VST3_MODULE_INFO_TOOL)
 $(VST3_MODULE_INFO_TOOL): src/plugin/vst3/moduleinfo.cpp | $(BUILD_DIR)
 	$(CPP_TARGET_PLATFORM) \
 		$(JS80P_CXXINCS) $(VST3_CXXINCS) $(VST3_CXXFLAGS) $(JS80P_CXXFLAGS) \
-		-std=c++17 \
 		$(VST3_MODULE_INFO_LFLAGS) \
 		$< -o $@
 
@@ -96,6 +95,7 @@ $(BUILD_DIR)/img_synth.o: gui/img/synth.png | $(BUILD_DIR)
 $(BUILD_DIR)/img_vst_logo.o: gui/img/vst_logo.png | $(BUILD_DIR)
 	$(OBJCOPY) $< $@
 
+# DEBUG_LOG_FILE ?= STDERR
 # DEBUG_LOG_FILE ?= /tmp/debug.txt
 
 RM = rm -f

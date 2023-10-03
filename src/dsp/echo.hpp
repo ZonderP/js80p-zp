@@ -23,8 +23,8 @@
 
 #include "dsp/biquad_filter.hpp"
 #include "dsp/delay.hpp"
-#include "dsp/effect.hpp"
 #include "dsp/param.hpp"
+#include "dsp/side_chain_compressable_effect.hpp"
 #include "dsp/signal_producer.hpp"
 
 
@@ -32,7 +32,7 @@ namespace JS80P
 {
 
 template<class InputSignalProducerClass>
-class Echo : public Effect<InputSignalProducerClass>
+class Echo : public SideChainCompressableEffect<InputSignalProducerClass>
 {
     friend class SignalProducer;
 
@@ -43,12 +43,12 @@ class Echo : public Effect<InputSignalProducerClass>
 
         Echo(std::string const name, InputSignalProducerClass& input);
 
-        FloatParam delay_time;
-        FloatParam feedback;
-        FloatParam damping_frequency;
-        FloatParam damping_gain;
-        FloatParam width;
-        FloatParam high_pass_frequency;
+        FloatParamS delay_time;
+        FloatParamS feedback;
+        FloatParamS damping_frequency;
+        FloatParamS damping_gain;
+        FloatParamS width;
+        FloatParamS high_pass_frequency;
         ToggleParam tempo_sync;
         ToggleParam log_scale_frequencies;
 
@@ -67,9 +67,10 @@ class Echo : public Effect<InputSignalProducerClass>
 
     private:
         typename HighPassedInput::TypeParam high_pass_filter_type;
-        FloatParam high_pass_filter_q;
-        FloatParam high_pass_filter_gain;
+        FloatParamS high_pass_filter_q;
+        FloatParamS high_pass_filter_gain;
 
+        BiquadFilterSharedCache high_shelf_filter_shared_cache;
         HighPassedInput high_pass_filter;
         CombFilter1 comb_filter_1;
         CombFilter2 comb_filter_2;

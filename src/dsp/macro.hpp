@@ -16,8 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef JS80P__DSP__FLEXIBLE_CONTROLLER_HPP
-#define JS80P__DSP__FLEXIBLE_CONTROLLER_HPP
+#ifndef JS80P__DSP__MACRO_HPP
+#define JS80P__DSP__MACRO_HPP
 
 #include <string>
 
@@ -30,32 +30,29 @@
 namespace JS80P
 {
 
-class FloatParam;
-
-
 /**
- * \brief Adjust the value of the \c input \c FloatParam, so that if that has a
- *        \c MidiController assigned, then the \c FlexibleController can be used
- *        as an adjustable version of that controller.
+ * \brief Adjust the value of the \c input \c FloatParamB, so that if that has a
+ *        \c MidiController assigned, then the \c Macro can be used as an
+ *        adjustable version of that controller.
  */
-class FlexibleController : public MidiController
+class Macro : public MidiController
 {
     public:
-        FlexibleController(std::string const name = "") noexcept;
+        Macro(std::string const name = "") noexcept;
 
         void update() noexcept;
 
-        FloatParam input;
-        FloatParam min;
-        FloatParam max;
-        FloatParam amount;
-        FloatParam distortion;
-        FloatParam randomness;
+        FloatParamB input;
+        FloatParamB min;
+        FloatParamB max;
+        FloatParamB amount;
+        FloatParamB distortion;
+        FloatParamB randomness;
 
     private:
         bool update_change_indices() noexcept;
         bool update_change_index(
-            FloatParam& param, Integer& change_index
+            FloatParamB& param, Integer& change_index
         ) const noexcept;
 
         Integer input_change_index;

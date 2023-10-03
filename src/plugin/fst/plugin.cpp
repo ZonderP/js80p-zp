@@ -21,7 +21,9 @@
 
 #include "plugin/fst/plugin.hpp"
 
+// #include "debug.hpp"
 #include "serializer.hpp"
+#include "spscqueue.cpp"
 
 
 namespace JS80P
@@ -30,84 +32,84 @@ namespace JS80P
 static constexpr int FST_OP_CODE_NAMES_LEN = 78;
 
 static constexpr char const* FST_OP_CODE_NAMES[FST_OP_CODE_NAMES_LEN] = {
-    "Open",                         // 0
-    "Close",                        // 1
-    "SetProgram",                   // 2
-    "GetProgram",                   // 3
-    "SetProgramName",               // 4
-    "GetProgramName",               // 5
-    "GetParamLabel",                // 6
-    "GetParamDisplay",              // 7
-    "GetParamName",                 // 8
-    "UNKNOWN-9",                    // 9
-    "SetSampleRate",                // 10
-    "SetBlockSize",                 // 11
-    "MainsChanged",                 // 12
-    "EditGetRect",                  // 13
-    "EditOpen",                     // 14
-    "EditClose",                    // 15
-    "UNKNOWN-16",                   // 16
-    "UNKNOWN-17",                   // 17
-    "UNKNOWN-18",                   // 18
-    "EditIdle",                     // 19
-    "UNKNOWN-20",                   // 20
-    "UNKNOWN-21",                   // 21
-    "Identify",                     // 22
-    "GetChunk",                     // 23
-    "SetChunk",                     // 24
-    "ProcessEvents",                // 25
-    "CanBeAutomated",               // 26
-    "String2Parameter",             // 27
-    "UNKNOWN-28",                   // 28
-    "GetProgramNameIndexed",        // 29
-    "UNKNOWN-30",                   // 30
-    "UNKNOWN-31",                   // 31
-    "UNKNOWN-32",                   // 32
-    "GetInputProperties",           // 33
-    "GetOutputProperties",          // 34
-    "GetPlugCategory",              // 35
-    "UNKNOWN-36",                   // 36
-    "UNKNOWN-37",                   // 37
-    "UNKNOWN-38",                   // 38
-    "UNKNOWN-39",                   // 39
-    "UNKNOWN-40",                   // 40
-    "UNKNOWN-41",                   // 41
-    "SetSpeakerArrangement",        // 42
-    "UNKNOWN-43",                   // 43
-    "UNKNOWN-44",                   // 44
-    "GetEffectName",                // 45
-    "UNKNOWN-46",                   // 46
-    "GetVendorString",              // 47
-    "GetProductString",             // 48
-    "GetVendorVersion",             // 49
-    "VendorSpecific",               // 50
-    "CanDo",                        // 51
-    "UNKNOWN-52",                   // 52
-    "UNKNOWN-53",                   // 53
-    "UNKNOWN-54",                   // 54
-    "UNKNOWN-55",                   // 55
-    "UNKNOWN-56",                   // 56
-    "UNKNOWN-57",                   // 57
-    "GetVstVersion",                // 58
-    "UNKNOWN-59",                   // 59
-    "UNKNOWN-60",                   // 60
-    "UNKNOWN-61",                   // 61
-    "UNKNOWN-62",                   // 62
-    "GetCurrentMidiProgram",        // 63
-    "UNKNOWN-64",                   // 64
-    "UNKNOWN-65",                   // 65
-    "GetMidiNoteName",              // 66
-    "UNKNOWN-67",                   // 67
-    "UNKNOWN-68",                   // 68
-    "GetSpeakerArrangement",        // 69
-    "ShellGetNextPlugin",           // 70
-    "StartProcess",                 // 71
-    "StopProcess",                  // 72
-    "SetTotalSampleToProcess",      // 73
-    "UNKNOWN-74",                   // 74
-    "UNKNOWN-75",                   // 75
-    "UNKNOWN-76",                   // 76
-    "SetProcessPrecision",          // 77
+    "Open",                         /*    0 */
+    "Close",                        /*    1 */
+    "SetProgram",                   /*    2 */
+    "GetProgram",                   /*    3 */
+    "SetProgramName",               /*    4 */
+    "GetProgramName",               /*    5 */
+    "GetParamLabel",                /*    6 */
+    "GetParamDisplay",              /*    7 */
+    "GetParamName",                 /*    8 */
+    "UNKNOWN-9",                    /*    9 */
+    "SetSampleRate",                /*   10 */
+    "SetBlockSize",                 /*   11 */
+    "MainsChanged",                 /*   12 */
+    "EditGetRect",                  /*   13 */
+    "EditOpen",                     /*   14 */
+    "EditClose",                    /*   15 */
+    "UNKNOWN-16",                   /*   16 */
+    "UNKNOWN-17",                   /*   17 */
+    "UNKNOWN-18",                   /*   18 */
+    "EditIdle",                     /*   19 */
+    "UNKNOWN-20",                   /*   20 */
+    "UNKNOWN-21",                   /*   21 */
+    "Identify",                     /*   22 */
+    "GetChunk",                     /*   23 */
+    "SetChunk",                     /*   24 */
+    "ProcessEvents",                /*   25 */
+    "CanBeAutomated",               /*   26 */
+    "String2Parameter",             /*   27 */
+    "UNKNOWN-28",                   /*   28 */
+    "GetProgramNameIndexed",        /*   29 */
+    "UNKNOWN-30",                   /*   30 */
+    "UNKNOWN-31",                   /*   31 */
+    "UNKNOWN-32",                   /*   32 */
+    "GetInputProperties",           /*   33 */
+    "GetOutputProperties",          /*   34 */
+    "GetPlugCategory",              /*   35 */
+    "UNKNOWN-36",                   /*   36 */
+    "UNKNOWN-37",                   /*   37 */
+    "UNKNOWN-38",                   /*   38 */
+    "UNKNOWN-39",                   /*   39 */
+    "UNKNOWN-40",                   /*   40 */
+    "UNKNOWN-41",                   /*   41 */
+    "SetSpeakerArrangement",        /*   42 */
+    "UNKNOWN-43",                   /*   43 */
+    "UNKNOWN-44",                   /*   44 */
+    "GetEffectName",                /*   45 */
+    "UNKNOWN-46",                   /*   46 */
+    "GetVendorString",              /*   47 */
+    "GetProductString",             /*   48 */
+    "GetVendorVersion",             /*   49 */
+    "VendorSpecific",               /*   50 */
+    "CanDo",                        /*   51 */
+    "UNKNOWN-52",                   /*   52 */
+    "Idle",                         /*   53, https://git.iem.at/zmoelnig/FST/-/issues/24 */
+    "UNKNOWN-54",                   /*   54 */
+    "UNKNOWN-55",                   /*   55 */
+    "UNKNOWN-56",                   /*   56 */
+    "UNKNOWN-57",                   /*   57 */
+    "GetVstVersion",                /*   58 */
+    "UNKNOWN-59",                   /*   59 */
+    "UNKNOWN-60",                   /*   60 */
+    "UNKNOWN-61",                   /*   61 */
+    "UNKNOWN-62",                   /*   62 */
+    "GetCurrentMidiProgram",        /*   63 */
+    "UNKNOWN-64",                   /*   64 */
+    "UNKNOWN-65",                   /*   65 */
+    "GetMidiNoteName",              /*   66 */
+    "UNKNOWN-67",                   /*   67 */
+    "UNKNOWN-68",                   /*   68 */
+    "GetSpeakerArrangement",        /*   69 */
+    "ShellGetNextPlugin",           /*   70 */
+    "StartProcess",                 /*   71 */
+    "StopProcess",                  /*   72 */
+    "SetTotalSampleToProcess",      /*   73 */
+    "UNKNOWN-74",                   /*   74 */
+    "UNKNOWN-75",                   /*   75 */
+    "UNKNOWN-76",                   /*   76 */
+    "SetProcessPrecision",          /*   77 */
 };
 
 
@@ -160,14 +162,21 @@ VstIntPtr VSTCALLBACK FstPlugin::dispatch(
     // if (
             // true
             // && op_code != effEditIdle
-            // && op_code != effProcessEvents
+            // && (op_code != effProcessEvents || fst_plugin->prev_logged_op_code != effProcessEvents)
             // && op_code != 53
             // && op_code != effGetProgram
+            // && op_code != effGetProgramName
+            // && op_code != effGetProductString
+            // && op_code != 67
+            // && op_code != 68
             // && op_code != effEditGetRect
+            // && op_code != effGetProgramNameIndexed
     // ) {
-        // fprintf(
-            // stderr,
-            // "op_code=%d, op_code_name=%s, index=%d, ivalue=%d, fvalue=%f\n",
+        // fst_plugin->prev_logged_op_code = op_code;
+
+        // JS80P_DEBUG(
+            // "plugin=%p, op_code=%d, op_code_name=%s, index=%d, ivalue=%d, fvalue=%f",
+            // effect->object,
             // (int)op_code,
             // ((op_code < FST_OP_CODE_NAMES_LEN) ? FST_OP_CODE_NAMES[op_code] : "???"),
             // (int)index,
@@ -176,10 +185,16 @@ VstIntPtr VSTCALLBACK FstPlugin::dispatch(
         // );
     // }
 
+    constexpr VstInt32 effIdle = 53; /* https://git.iem.at/zmoelnig/FST/-/issues/24 */
+
     switch (op_code) {
         case effProcessEvents:
-            fst_plugin->process_events((VstEvents*)pointer);
+            fst_plugin->process_vst_events((VstEvents*)pointer);
             return 1;
+
+        case effOpen:
+            fst_plugin->initialize();
+            return 0;
 
         case effClose:
             delete fst_plugin;
@@ -216,7 +231,7 @@ VstIntPtr VSTCALLBACK FstPlugin::dispatch(
             return 0;
 
         case effCanBeAutomated:
-            return 1;
+            return fst_plugin->is_automatable((size_t)index) ? 1 : 0;
 
         case effSetSampleRate:
             fst_plugin->set_sample_rate(fvalue);
@@ -294,6 +309,9 @@ VstIntPtr VSTCALLBACK FstPlugin::dispatch(
             // );
             return 0;
 
+        case effIdle:
+            return fst_plugin->idle();
+
         default:
             return 0;
     }
@@ -368,13 +386,23 @@ FstPlugin::FstPlugin(
     platform_data(platform_data),
     gui(NULL),
     renderer(synth),
+    to_audio_messages(1024),
+    to_audio_string_messages(256),
+    to_gui_messages(1024),
     serialized_bank(""),
-    next_program(0),
+    current_patch(""),
+    current_program_index(0),
     min_samples_before_next_cc_ui_update(8192),
     remaining_samples_before_next_cc_ui_update(0),
-    save_current_patch_before_changing_program(false),
-    had_midi_cc_event(false)
+    min_samples_before_next_bank_update(16384),
+    remaining_samples_before_next_bank_update(0),
+    prev_logged_op_code(-1),
+    had_midi_cc_event(false),
+    need_bank_update(false),
+    need_host_update(false)
 {
+    clear_received_midi_cc();
+
     window_rect.top = 0;
     window_rect.left = 0;
     window_rect.bottom = GUI::HEIGHT;
@@ -400,7 +428,7 @@ FstPlugin::FstPlugin(
         /*
         The sustain pedal was added in v1.9.0, but if it was put in the middle
         of the list of exported parameters, then it could break DAW projects
-        that have automations for parameter which come after it. In order to
+        that have automations for parameters which come after it. In order to
         avoid such backward-incompatibility, we need to put it at the end.
         */
         if (midi_controller == Midi::SUSTAIN_PEDAL) {
@@ -418,6 +446,11 @@ FstPlugin::FstPlugin(
         Synth::ControllerId::SUSTAIN_PEDAL,
         synth.midi_controllers[Synth::ControllerId::SUSTAIN_PEDAL]
     );
+
+    serialized_bank = bank.serialize();
+    current_patch = bank[current_program_index].serialize();
+
+    program_names.import_names(serialized_bank);
 }
 
 
@@ -427,13 +460,249 @@ FstPlugin::~FstPlugin()
 }
 
 
+void FstPlugin::process_internal_messages_in_audio_thread(
+        SPSCQueue<FstPlugin::Message>& messages
+) noexcept {
+    SPSCQueue<Message>::SizeType const message_count = messages.length();
+
+    for (size_t i = 0; i != message_count; ++i) {
+        Message message;
+
+        if (!messages.pop(message)) {
+            continue;
+        }
+
+        switch (message.get_type()) {
+            case MessageType::CHANGE_PROGRAM:
+                handle_change_program(message.get_index());
+                break;
+
+            case MessageType::RENAME_PROGRAM:
+                handle_rename_program(message.get_serialized_data());
+                break;
+
+            case MessageType::CHANGE_PARAM:
+                handle_change_param(
+                    message.get_controller_id(),
+                    message.get_new_value(),
+                    message.get_midi_controller()
+                );
+                break;
+
+            case MessageType::IMPORT_PATCH:
+                handle_import_patch(message.get_serialized_data());
+                break;
+
+            case MessageType::IMPORT_BANK:
+                handle_import_bank(message.get_serialized_data());
+                break;
+
+            default:
+                break;
+        }
+    }
+}
+
+
+void FstPlugin::handle_change_program(size_t const new_program) noexcept
+{
+    if (new_program >= Bank::NUMBER_OF_PROGRAMS) {
+        return;
+    }
+
+    size_t const old_program = bank.get_current_program_index();
+
+    if (new_program == old_program) {
+        return;
+    }
+
+    std::string const new_patch(bank[new_program].serialize());
+
+    synth.process_messages();
+    bank[old_program].import(Serializer::serialize(synth));
+    Serializer::import_patch_in_audio_thread(synth, new_patch);
+    synth.clear_dirty_flag();
+    renderer.reset();
+    bank.set_current_program_index(new_program);
+
+    need_bank_update = true;
+}
+
+
+void FstPlugin::handle_rename_program(std::string const& name) noexcept
+{
+    size_t const current_program_index = bank.get_current_program_index();
+    Bank::Program& current_program = bank[current_program_index];
+
+    current_program.set_name(name);
+
+    need_bank_update = true;
+}
+
+
+void FstPlugin::handle_change_param(
+        Midi::Controller const controller_id,
+        Number const new_value,
+        MidiController* const midi_controller
+) noexcept {
+    if (Synth::is_supported_midi_controller(controller_id)) {
+        if (midi_cc_received[(size_t)controller_id]) {
+            return;
+        }
+
+        /*
+        Some hosts (e.g. FL Studio 21) swallow most MIDI CC messages, and
+        the only way to make physical knobs and faders on a MIDI keyboard
+        work in the plugin is to export parameters to which those MIDI CC
+        messages can be assigned in the host, and then interpret the
+        changes of these parameters as if the corresponding MIDI CC message
+        had been received.
+        */
+
+        synth.control_change(
+            0.0, 0, controller_id, float_to_midi_byte(new_value)
+        );
+    } else if (LIKELY(midi_controller != NULL)) {
+        midi_controller->change(0.0, new_value);
+    }
+}
+
+
+void FstPlugin::handle_import_patch(std::string const& patch) noexcept
+{
+    size_t const current_program = bank.get_current_program_index();
+
+    Serializer::import_patch_in_audio_thread(synth, patch);
+    synth.clear_dirty_flag();
+    renderer.reset();
+
+    std::string const& serialized_patch(Serializer::serialize(synth));
+
+    bank[current_program].import(serialized_patch);
+
+    need_bank_update = true;
+}
+
+
+void FstPlugin::handle_import_bank(std::string const& serialized_bank) noexcept
+{
+    size_t const current_program = bank.get_current_program_index();
+
+    bank.import(serialized_bank);
+
+    Serializer::import_patch_in_audio_thread(
+        synth, bank[current_program].serialize()
+    );
+    synth.clear_dirty_flag();
+    renderer.reset();
+
+    need_bank_update = true;
+}
+
+
+void FstPlugin::process_internal_messages_in_gui_thread() noexcept
+{
+    SPSCQueue<Message>::SizeType const message_count = to_gui_messages.length();
+
+    for (size_t i = 0; i != message_count; ++i) {
+        Message message;
+
+        if (!to_gui_messages.pop(message)) {
+            continue;
+        }
+
+        switch (message.get_type()) {
+            case MessageType::PROGRAM_CHANGED:
+                handle_program_changed(
+                    message.get_index(), message.get_serialized_data()
+                );
+                break;
+
+            case MessageType::BANK_CHANGED:
+                handle_bank_changed(message.get_serialized_data());
+                break;
+
+            case MessageType::PARAMS_CHANGED:
+                handle_params_changed();
+                break;
+
+            default:
+                break;
+        }
+    }
+}
+
+
+void FstPlugin::handle_program_changed(
+        size_t const new_program,
+        std::string const& patch
+) noexcept {
+    Bank::Program program;
+
+    current_program_index = new_program;
+    current_patch = patch;
+
+    program.import(patch);
+    program_names[current_program_index].set_name(program.get_name());
+
+    parameters[0].set_value(
+        Bank::program_index_to_normalized_parameter_value(new_program)
+    );
+}
+
+
+void FstPlugin::handle_bank_changed(std::string const& serialized_bank) noexcept
+{
+    this->serialized_bank = serialized_bank;
+
+    program_names.import_names(serialized_bank);
+}
+
+
+void FstPlugin::handle_params_changed() noexcept
+{
+    need_host_update = true;
+}
+
+
+void FstPlugin::initialize() noexcept
+{
+    need_idle();
+}
+
+
+void FstPlugin::need_idle() noexcept
+{
+    /* https://git.iem.at/zmoelnig/FST/-/issues/24 */
+    constexpr int audioMasterNeedIdle = 14;
+
+    host_callback(effect, audioMasterNeedIdle, 0, 0, NULL, 0.0f);
+}
+
+
+VstIntPtr FstPlugin::idle() noexcept
+{
+    process_internal_messages_in_gui_thread();
+    update_host_display();
+
+    return 1;
+}
+
+
 void FstPlugin::set_sample_rate(float const new_sample_rate) noexcept
 {
+    process_internal_messages_in_gui_thread();
+
     if (new_sample_rate > HOST_CC_UI_UPDATE_FREQUENCY) {
         min_samples_before_next_cc_ui_update = 1 + (Integer)(
             new_sample_rate * HOST_CC_UI_UPDATE_FREQUENCY_INV
         );
         remaining_samples_before_next_cc_ui_update = min_samples_before_next_cc_ui_update;
+
+        min_samples_before_next_bank_update = 1 + (Integer)(
+            new_sample_rate * BANK_UPDATE_FREQUENCY_INV
+        );
+        remaining_samples_before_next_bank_update = min_samples_before_next_bank_update;
     }
 
     synth.set_sample_rate((Frequency)new_sample_rate);
@@ -442,6 +711,7 @@ void FstPlugin::set_sample_rate(float const new_sample_rate) noexcept
 
 void FstPlugin::set_block_size(VstIntPtr const new_block_size) noexcept
 {
+    process_internal_messages_in_gui_thread();
     synth.set_block_size((Integer)new_block_size);
     renderer.reset();
 }
@@ -449,6 +719,8 @@ void FstPlugin::set_block_size(VstIntPtr const new_block_size) noexcept
 
 void FstPlugin::suspend() noexcept
 {
+    process_internal_messages_in_gui_thread();
+    need_idle();
     synth.suspend();
     renderer.reset();
 }
@@ -459,28 +731,39 @@ void FstPlugin::resume() noexcept
     synth.resume();
     renderer.reset();
     host_callback(effect, audioMasterWantMidi, 0, 1, NULL, 0.0f);
+    process_internal_messages_in_gui_thread();
+    need_idle();
 }
 
 
-void FstPlugin::process_events(VstEvents const* const events) noexcept
+void FstPlugin::process_vst_events(VstEvents const* const events) noexcept
 {
+    clear_received_midi_cc();
+
     for (VstInt32 i = 0; i < events->numEvents; ++i) {
         VstEvent* event = events->events[i];
 
         if (event->type == kVstMidiType) {
-            process_midi_event((VstMidiEvent*)event);
+            process_vst_midi_event((VstMidiEvent*)event);
         }
     }
 
     if (had_midi_cc_event && remaining_samples_before_next_cc_ui_update == 0) {
         had_midi_cc_event = false;
         remaining_samples_before_next_cc_ui_update = min_samples_before_next_cc_ui_update;
-        update_host_display();
+        to_gui_messages.push(Message(MessageType::PARAMS_CHANGED));
     }
 }
 
 
-void FstPlugin::process_midi_event(VstMidiEvent const* const event) noexcept
+void FstPlugin::clear_received_midi_cc() noexcept
+{
+    midi_cc_received.reset();
+    received_midi_cc_cleared = true;
+}
+
+
+void FstPlugin::process_vst_midi_event(VstMidiEvent const* const event) noexcept
 {
     Seconds const time_offset = (
         synth.sample_count_to_time_offset((Integer)event->deltaFrames)
@@ -502,13 +785,18 @@ void FstPlugin::generate_samples(
     }
 
     prepare_rendering(sample_count);
-    renderer.write_next_round<NumberType>(sample_count, samples);
+    renderer.render<NumberType>(sample_count, samples);
+    finalize_rendering(sample_count);
 
     /*
     It would be nice to notify the host about param changes that originate from
     the plugin, but since these parameters only ever change due to MIDI CC
     messages, we don't want the host to record them both as MIDI CC and as
     parameter automation.
+
+    Also, since parameter handling seems to be done in the GUI thread and
+    generate_samples() is run in the audio thread, this call would cross
+    threads, which is probably unsafe in most hosts.
     */
     // for (size_t i = 0; i != NUMBER_OF_PARAMETERS; ++i) {
         // if (UNLIKELY(parameters[i].needs_host_update())) {
@@ -527,8 +815,15 @@ void FstPlugin::generate_samples(
 
 void FstPlugin::prepare_rendering(Integer const sample_count) noexcept
 {
-    handle_program_change();
-    handle_parameter_changes();
+    if (!received_midi_cc_cleared) {
+        clear_received_midi_cc();
+    }
+
+    received_midi_cc_cleared = false;
+
+    process_internal_messages_in_audio_thread(to_audio_string_messages);
+    process_internal_messages_in_audio_thread(to_audio_messages);
+
     update_bpm();
 
     if (had_midi_cc_event) {
@@ -541,68 +836,37 @@ void FstPlugin::prepare_rendering(Integer const sample_count) noexcept
 }
 
 
-void FstPlugin::handle_program_change() noexcept
+void FstPlugin::finalize_rendering(Integer const sample_count) noexcept
 {
-    if (parameters[0].is_dirty()) {
-        this->next_program = Bank::normalized_parameter_value_to_program_index(
-            (Number)parameters[0].get_last_set_value()
-        );
-    }
+    if (remaining_samples_before_next_bank_update >= sample_count) {
+        remaining_samples_before_next_bank_update -= sample_count;
 
-    size_t const next_program = this->next_program;
-    size_t const current_program = bank.get_current_program_index();
+        return;
+    } else if (remaining_samples_before_next_bank_update > 0) {
+        remaining_samples_before_next_bank_update = 0;
 
-    if (next_program == current_program) {
         return;
     }
 
-    if (save_current_patch_before_changing_program) {
-        bank[current_program].import(Serializer::serialize(synth));
-    } else {
-        save_current_patch_before_changing_program = true;
+    if (LIKELY(!(synth.is_dirty() || need_bank_update))) {
+        return;
     }
 
-    bank.set_current_program_index(next_program);
-    import_patch(bank[next_program].serialize());
-}
+    remaining_samples_before_next_bank_update = min_samples_before_next_bank_update;
+    need_bank_update = false;
+    synth.clear_dirty_flag();
 
+    size_t const current_program = bank.get_current_program_index();
+    std::string const& current_patch = Serializer::serialize(synth);
 
-void FstPlugin::handle_parameter_changes() noexcept
-{
-    for (size_t i = 1; i != NUMBER_OF_PARAMETERS; ++i) {
-        Parameter& parameter = parameters[i];
+    bank[current_program].import(current_patch);
 
-        if (LIKELY(!parameter.is_dirty())) {
-            continue;
-        }
+    std::string const& serialized_bank(bank.serialize());
 
-        Midi::Controller const controller_id = parameter.get_controller_id();
-
-        parameter.clear();
-
-        if (Synth::is_supported_midi_controller(controller_id)) {
-            /*
-            Some hosts (e.g. FL Studio 21) swallow most MIDI CC messages, and
-            the only way to make physical knobs and faders on a MIDI keyboard
-            work in the plugin is to export parameters to which those MIDI CC
-            messages can be assigned in the host, and then interpret the
-            changes of these parameters as if the corresponding MIDI CC message
-            had been received.
-            */
-            synth.control_change(
-                0.0,
-                0,
-                controller_id,
-                float_to_midi_byte(parameter.get_last_set_value())
-            );
-        } else {
-            MidiController* const midi_controller = parameter.get_midi_controller();
-
-            if (LIKELY(midi_controller != NULL)) {
-                midi_controller->change(0.0, (Number)parameter.get_last_set_value());
-            }
-        }
-    }
+    to_gui_messages.push(
+        Message(MessageType::PROGRAM_CHANGED, current_program, current_patch)
+    );
+    to_gui_messages.push(Message(MessageType::BANK_CHANGED, 0, serialized_bank));
 }
 
 
@@ -633,7 +897,10 @@ void FstPlugin::update_bpm() noexcept
 
 void FstPlugin::update_host_display() noexcept
 {
-    host_callback(effect, audioMasterUpdateDisplay, 0, 0, NULL, 0.0f);
+    if (need_host_update) {
+        need_host_update = false;
+        host_callback(effect, audioMasterUpdateDisplay, 0, 0, NULL, 0.0f);
+    }
 }
 
 
@@ -646,60 +913,65 @@ void FstPlugin::generate_and_add_samples(
     }
 
     prepare_rendering(sample_count);
-    renderer.add_next_round<float>(sample_count, samples);
-}
-
-
-void FstPlugin::import_patch(const std::string& patch) noexcept
-{
-    synth.process_messages();
-    Serializer::import(synth, patch);
-    synth.process_messages();
-    renderer.reset();
+    renderer.render<float, Renderer::Operation::ADD>(sample_count, samples);
+    finalize_rendering(sample_count);
 }
 
 
 VstIntPtr FstPlugin::get_chunk(void** chunk, bool is_preset) noexcept
 {
-    size_t const current_program = bank.get_current_program_index();
-
-    bank[current_program].import(Serializer::serialize(synth));
+    process_internal_messages_in_gui_thread();
 
     if (is_preset) {
-        std::string const& serialized = bank[current_program].serialize();
-        *chunk = (void*)serialized.c_str();
+        Bank::Program program;
 
-        return (VstIntPtr)serialized.size();
+        program.import(current_patch);
+        program.set_name(program_names[current_program_index].get_name());
+
+        current_patch = program.serialize();
+
+        *chunk = (void*)current_patch.c_str();
+
+        return (VstIntPtr)current_patch.length();
     } else {
-        serialized_bank = bank.serialize();
         *chunk = (void*)serialized_bank.c_str();
 
-        return (VstIntPtr)serialized_bank.size();
+        return (VstIntPtr)serialized_bank.length();
     }
 }
 
 
 void FstPlugin::set_chunk(void const* chunk, VstIntPtr const size, bool is_preset) noexcept
 {
-    size_t current_program = 0;
-
-    save_current_patch_before_changing_program = false;
+    process_internal_messages_in_gui_thread();
 
     std::string buffer((char const*)chunk, (std::string::size_type)size);
 
     if (is_preset) {
-        current_program = bank.get_current_program_index();
-        bank[current_program].import(buffer);
-        import_patch(bank[current_program].serialize());
-    } else {
-        bank.import(buffer);
-        current_program = bank.get_current_program_index();
-        import_patch(bank[current_program].serialize());
-    }
+        current_patch = buffer;
 
-    parameters[0].set_value(
-        (float)Bank::program_index_to_normalized_parameter_value(current_program)
-    );
+        Bank::Program program;
+        program.import(current_patch);
+
+        std::string const& name(program.get_name());
+
+        program_names[current_program_index].set_name(name);
+
+        to_audio_string_messages.push(
+            Message(MessageType::IMPORT_PATCH, 0, current_patch)
+        );
+        to_audio_string_messages.push(
+            Message(MessageType::RENAME_PROGRAM, 0, name)
+        );
+    } else {
+        serialized_bank = buffer;
+
+        program_names.import_names(serialized_bank);
+
+        to_audio_string_messages.push(
+            Message(MessageType::IMPORT_BANK, 0, serialized_bank)
+        );
+    }
 }
 
 
@@ -710,6 +982,10 @@ void FstPlugin::control_change(
         Midi::Byte const new_value
 ) noexcept {
     had_midi_cc_event = true;
+
+    if (synth.is_supported_midi_controller(controller)) {
+        midi_cc_received[(size_t)controller] = true;
+    }
 }
 
 
@@ -718,8 +994,8 @@ void FstPlugin::program_change(
         Midi::Channel const channel,
         Midi::Byte const new_program
 ) noexcept {
-    set_program((size_t)new_program);
     had_midi_cc_event = true;
+    handle_change_program((size_t)new_program);
 }
 
 
@@ -741,32 +1017,37 @@ void FstPlugin::pitch_wheel_change(
 }
 
 
-VstIntPtr FstPlugin::get_program() const noexcept
+VstIntPtr FstPlugin::get_program() noexcept
 {
-    return next_program;
+    return current_program_index;
 }
 
 
 void FstPlugin::set_program(size_t index) noexcept
 {
-    if (index >= Bank::NUMBER_OF_PROGRAMS || index == next_program) {
-        return;
-    }
-
-    next_program = index;
+    current_program_index = index;
     parameters[0].set_value(
-        (float)Bank::program_index_to_normalized_parameter_value(index)
+        Bank::program_index_to_normalized_parameter_value(index)
     );
+
+    to_audio_messages.push(Message(MessageType::CHANGE_PROGRAM, index));
 }
 
 
 VstIntPtr FstPlugin::get_program_name(char* name, size_t index) noexcept
 {
+    process_internal_messages_in_gui_thread();
+
     if (index >= Bank::NUMBER_OF_PROGRAMS) {
         return 0;
     }
 
-    strncpy(name, bank[index].get_name().c_str(), kVstMaxProgNameLen - 1);
+    strncpy(
+        name,
+        program_names[index].get_name().c_str(),
+        kVstMaxProgNameLen - 1
+    );
+    name[kVstMaxProgNameLen - 1] = '\x00';
 
     return 1;
 }
@@ -774,18 +1055,30 @@ VstIntPtr FstPlugin::get_program_name(char* name, size_t index) noexcept
 
 void FstPlugin::get_program_name(char* name) noexcept
 {
-    strncpy(name, bank[next_program].get_name().c_str(), kVstMaxProgNameLen - 1);
+    process_internal_messages_in_gui_thread();
+
+    strncpy(
+        name,
+        program_names[current_program_index].get_name().c_str(),
+        kVstMaxProgNameLen - 1
+    );
+    name[kVstMaxProgNameLen - 1] = '\x00';
 }
 
 
 void FstPlugin::set_program_name(const char* name)
 {
-    bank[next_program].set_name(name);
+    process_internal_messages_in_gui_thread();
+
+    to_audio_string_messages.push(Message(MessageType::RENAME_PROGRAM, 0, name));
+    program_names[current_program_index].set_name(name);
 }
 
 
 void FstPlugin::open_gui(GUI::PlatformWidget parent_window)
 {
+    process_internal_messages_in_gui_thread();
+
     close_gui();
     gui = new GUI(FST_H_VERSION, platform_data, parent_window, synth, false);
     gui->show();
@@ -794,6 +1087,9 @@ void FstPlugin::open_gui(GUI::PlatformWidget parent_window)
 
 void FstPlugin::gui_idle()
 {
+    process_internal_messages_in_gui_thread();
+    update_host_display();
+
     /*
     Some hosts (e.g. Ardour 5.12.0) send an effEditIdle message before sending
     the first effEditOpen.
@@ -808,13 +1104,18 @@ void FstPlugin::gui_idle()
 
 void FstPlugin::close_gui()
 {
+    process_internal_messages_in_gui_thread();
+
     if (gui == NULL) {
+        need_idle();
+
         return;
     }
 
     delete gui;
 
     gui = NULL;
+    need_idle();
 }
 
 
@@ -837,8 +1138,7 @@ FstPlugin::Parameter::Parameter()
     name("unknown"),
     controller_id(0),
     // change_index(-1), /* See FstPlugin::generate_samples() */
-    value(0.5f),
-    is_dirty_(false)
+    value(0.5f)
 {
 }
 
@@ -851,63 +1151,8 @@ FstPlugin::Parameter::Parameter(
     name(name),
     controller_id(controller_id),
     // change_index(-1), /* See FstPlugin::generate_samples() */
-    value(0.5f),
-    is_dirty_(false)
+    value(0.5f)
 {
-}
-
-
-FstPlugin::Parameter::Parameter(Parameter const& parameter)
-    : midi_controller(parameter.midi_controller),
-    name(parameter.name),
-    controller_id(parameter.controller_id),
-    // change_index(-1), /* See FstPlugin::generate_samples() */
-    value(parameter.value),
-    is_dirty_(parameter.is_dirty_)
-{
-}
-
-
-FstPlugin::Parameter::Parameter(Parameter const&& parameter)
-    : midi_controller(parameter.midi_controller),
-    name(parameter.name),
-    controller_id(parameter.controller_id),
-    // change_index(-1), /* See FstPlugin::generate_samples() */
-    value(parameter.value),
-    is_dirty_(parameter.is_dirty_)
-{
-}
-
-
-FstPlugin::Parameter& FstPlugin::Parameter::operator=(
-        Parameter const& parameter
-) noexcept {
-    if (this != &parameter) {
-        midi_controller = parameter.midi_controller;
-        name = parameter.name;
-        controller_id = parameter.controller_id;
-        // change_index = parameter.change_index; /* See FstPlugin::generate_samples() */
-        value = parameter.value;
-        is_dirty_ = parameter.is_dirty_;
-    }
-
-    return *this;
-}
-
-
-FstPlugin::Parameter& FstPlugin::Parameter::operator=(
-        Parameter const&& parameter
-) noexcept {
-    if (this != &parameter) {
-        midi_controller = parameter.midi_controller;
-        name = parameter.name;
-        controller_id = parameter.controller_id;
-        // change_index = parameter.change_index; /* See FstPlugin::generate_samples() */
-        value = parameter.value;
-        is_dirty_ = parameter.is_dirty_;
-    }
-
-    return *this;
 }
 
 
@@ -949,13 +1194,13 @@ float FstPlugin::Parameter::get_value() noexcept
     float const value = (float)midi_controller->get_value();
 
     /* See FstPlugin::generate_samples() */
-    // change_index=  midi_controller->get_change_index();
+    // change_index = midi_controller->get_change_index();
 
     return value;
 }
 
 
-float FstPlugin::Parameter::get_last_set_value() noexcept
+float FstPlugin::Parameter::get_last_set_value() const noexcept
 {
     return this->value;
 }
@@ -964,19 +1209,6 @@ float FstPlugin::Parameter::get_last_set_value() noexcept
 void FstPlugin::Parameter::set_value(float const value) noexcept
 {
     this->value = value;
-    is_dirty_ = true;
-}
-
-
-void FstPlugin::Parameter::clear() noexcept
-{
-    is_dirty_ = false;
-}
-
-
-bool FstPlugin::Parameter::is_dirty() const noexcept
-{
-    return is_dirty_;
 }
 
 
@@ -988,12 +1220,39 @@ float FstPlugin::get_parameter(size_t index) noexcept
 
 void FstPlugin::set_parameter(size_t index, float value) noexcept
 {
-    parameters[index].set_value(value);
+    Parameter& param = parameters[index];
+
+    param.set_value(value);
+
+    if (index == 0) {
+        size_t const program = (
+            Bank::normalized_parameter_value_to_program_index((Number)value)
+        );
+
+        to_audio_messages.push(Message(MessageType::CHANGE_PROGRAM, program));
+        current_program_index = program;
+    } else {
+        to_audio_messages.push(
+            Message(
+                param.get_controller_id(),
+                (Number)value,
+                param.get_midi_controller()
+            )
+        );
+    }
 }
 
 
-void FstPlugin::get_param_label(size_t index, char* buffer) const noexcept
+bool FstPlugin::is_automatable(size_t index) noexcept
 {
+    return index < NUMBER_OF_PARAMETERS;
+}
+
+
+void FstPlugin::get_param_label(size_t index, char* buffer) noexcept
+{
+    process_internal_messages_in_gui_thread();
+
     strncpy(buffer, index == 0 ? "" : "%", kVstMaxParamStrLen);
     buffer[kVstMaxParamStrLen - 1] = '\x00';
 }
@@ -1001,6 +1260,8 @@ void FstPlugin::get_param_label(size_t index, char* buffer) const noexcept
 
 void FstPlugin::get_param_display(size_t index, char* buffer) noexcept
 {
+    process_internal_messages_in_gui_thread();
+
     if (index == 0) {
         size_t const program_index = (
             Bank::normalized_parameter_value_to_program_index(
@@ -1011,7 +1272,7 @@ void FstPlugin::get_param_display(size_t index, char* buffer) noexcept
         if (program_index < Bank::NUMBER_OF_PROGRAMS) {
             strncpy(
                 buffer,
-                bank[program_index].get_short_name().c_str(),
+                program_names[program_index].get_short_name().c_str(),
                 kVstMaxParamStrLen - 1
             );
         } else {
@@ -1027,10 +1288,81 @@ void FstPlugin::get_param_display(size_t index, char* buffer) noexcept
 }
 
 
-void FstPlugin::get_param_name(size_t index, char* buffer) const noexcept
+void FstPlugin::get_param_name(size_t index, char* buffer) noexcept
 {
+    process_internal_messages_in_gui_thread();
+
     strncpy(buffer, parameters[index].get_name(), kVstMaxParamStrLen);
     buffer[kVstMaxParamStrLen - 1] = '\x00';
+}
+
+
+FstPlugin::Message::Message() : Message(MessageType::NONE)
+{
+}
+
+
+FstPlugin::Message::Message(
+        MessageType const type,
+        size_t const index,
+        std::string const& serialized_data
+) : serialized_data(serialized_data),
+    midi_controller(NULL),
+    new_value(0.0),
+    index(index),
+    type(type),
+    controller_id(0)
+{
+}
+
+
+FstPlugin::Message::Message(
+        Midi::Controller const controller_id,
+        Number const new_value,
+        MidiController* const midi_controller
+) : serialized_data(""),
+    midi_controller(midi_controller),
+    new_value(new_value),
+    index(0),
+    type(MessageType::CHANGE_PARAM),
+    controller_id(controller_id)
+{
+}
+
+
+FstPlugin::MessageType FstPlugin::Message::get_type() const noexcept
+{
+    return type;
+}
+
+
+size_t FstPlugin::Message::get_index() const noexcept
+{
+    return index;
+}
+
+
+std::string const& FstPlugin::Message::get_serialized_data() const noexcept
+{
+    return serialized_data;
+}
+
+
+Midi::Controller FstPlugin::Message::get_controller_id() const noexcept
+{
+    return controller_id;
+}
+
+
+Number FstPlugin::Message::get_new_value() const noexcept
+{
+    return new_value;
+}
+
+
+MidiController* FstPlugin::Message::get_midi_controller() const noexcept
+{
+    return midi_controller;
 }
 
 }

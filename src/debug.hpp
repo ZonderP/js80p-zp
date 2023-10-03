@@ -34,26 +34,52 @@
 #include "js80p.hpp"
 
 
+#ifdef _WIN32
+#include <windows.h>
+#define _JS80P_GET_TID() ((unsigned int)GetCurrentThreadId())
+#define _JS80P_TID_FMT "\tTID=%#x"
+#elif __linux__ || __gnu_linux__
+#include <unistd.h>
+#include <sys/syscall.h>
+#define _JS80P_GET_TID() ((unsigned int)syscall(SYS_gettid))
+#define _JS80P_TID_FMT "\tTID=%#x"
+#else
+#define _JS80P_GET_TID() ("")
+#define _JS80P_TID_FMT "%s"
+#endif
+
+
 #define _JS80P_DEBUG_CTX(debug_action) do {                                 \
-    constexpr char const* last_slash = strrchr(__FILE__, '/');              \
-    constexpr char const* basename = (                                      \
-        last_slash != NULL ? last_slash + 1 : __FILE__                      \
+    char const* const _js80p_last_slash = strrchr(__FILE__, '/');           \
+    char const* const _js80p_basename = (                                   \
+        _js80p_last_slash != NULL ? _js80p_last_slash + 1 : __FILE__        \
     );                                                                      \
-    FILE* _js80p_f = fopen(JS80P_TO_STRING(JS80P_DEBUG_LOG), "a+");         \
+    bool const _js80p_use_stderr = (                                        \
+        strncmp("STDERR", JS80P_TO_STRING(JS80P_DEBUG_LOG), 7) == 0         \
+    );                                                                      \
+    FILE* _js80p_f = (                                                      \
+        _js80p_use_stderr                                                   \
+            ? stderr                                                        \
+            : fopen(JS80P_TO_STRING(JS80P_DEBUG_LOG), "a+")                 \
+    );                                                                      \
                                                                             \
     if (_js80p_f) {                                                         \
         fprintf(                                                            \
             _js80p_f,                                                       \
-            "%s:%d/%s():\t",                                                \
-            basename,                                                       \
+            "%s:%d/%s():" _JS80P_TID_FMT "\t",                              \
+            _js80p_basename,                                                \
             __LINE__,                                                       \
-            __FUNCTION__                                                    \
+            __FUNCTION__,                                                   \
+            _JS80P_GET_TID()                                                \
         );                                                                  \
                                                                             \
         debug_action;                                                       \
                                                                             \
         fprintf(_js80p_f, "\n");                                            \
-        fclose(_js80p_f);                                                   \
+                                                                            \
+        if (!_js80p_use_stderr) {                                           \
+            fclose(_js80p_f);                                               \
+        }                                                                   \
     }                                                                       \
 } while (false)
 
@@ -70,21 +96,21 @@
 #define JS80P_DEBUG_ARRAY(message, array, length, format_string)            \
     _JS80P_DEBUG_CTX(                                                       \
         if ((array) == NULL) {                                              \
-            fprintf(__f, "%s: <NULL>", (message));                          \
+            fprintf(_js80p_f, "%s: <NULL>", (message));                     \
         } else {                                                            \
             int _js80p_i;                                                   \
                                                                             \
-            fprintf(__f, "%s: [ ", (message));                              \
+            fprintf(_js80p_f, "%s: [ ", (message));                         \
                                                                             \
             for (_js80p_i = 0; _js80p_i < (length); ++_js80p_i) {           \
                 if (_js80p_i > 0) {                                         \
-                    fprintf(__f, ", ");                                     \
+                    fprintf(_js80p_f, ", ");                                \
                 }                                                           \
                                                                             \
-                fprintf(__f, (format_string), (array)[_js80p_i]);           \
+                fprintf(_js80p_f, (format_string), (array)[_js80p_i]);      \
             }                                                               \
                                                                             \
-            fprintf(__f, " ]");                                             \
+            fprintf(_js80p_f, " ]");                                        \
         }                                                                   \
     )
 

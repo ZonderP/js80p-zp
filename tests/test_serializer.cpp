@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <algorithm>
 #include <string>
 
 #include "test.cpp"
@@ -52,7 +53,6 @@ void assert_in(std::string const& needle, std::string const& haystack)
 TEST(can_convert_synth_configuration_to_string_and_import_it, {
     Synth synth_1;
     Synth synth_2;
-    Serializer serializer;
     std::string serialized;
     Number const inv_saw_as_ratio = (
         synth_1.modulator_params.waveform.value_to_ratio(
@@ -107,13 +107,12 @@ TEST(can_convert_synth_configuration_to_string_and_import_it, {
         Synth::MessageType::ASSIGN_CONTROLLER,
         Synth::ParamId::MVOL,
         0.0,
-        Synth::ControllerId::FLEXIBLE_CONTROLLER_1
+        Synth::ControllerId::MACRO_1
     );
     synth_2.process_messages();
 
-    serialized = serializer.serialize(synth_1);
-    serializer.import(synth_2, serialized);
-    synth_2.process_messages();
+    serialized = Serializer::serialize(synth_1);
+    Serializer::import_patch_in_audio_thread(synth_2, serialized);
 
     assert_in("\r\nPM = 0.123", serialized);
 
@@ -142,7 +141,6 @@ TEST(can_convert_synth_configuration_to_string_and_import_it, {
 
 TEST(importing_a_patch_ignores_comments_and_whitespace_and_unknown_sections, {
     Synth synth;
-    Serializer serializer;
     std::string const patch = (
         "  [  \t   js80p   \t   ]    ; comment\n"
         "; PM = 0.99\n"
@@ -154,8 +152,7 @@ TEST(importing_a_patch_ignores_comments_and_whitespace_and_unknown_sections, {
         "PM = 0.123\n"
     );
 
-    serializer.import(synth, patch);
-    synth.process_messages();
+    Serializer::import_patch_in_audio_thread(synth, patch);
 
     assert_eq(
         0.42, synth.get_param_ratio_atomic(Synth::ParamId::PM), DOUBLE_DELTA
@@ -168,7 +165,6 @@ TEST(importing_a_patch_ignores_comments_and_whitespace_and_unknown_sections, {
 
 TEST(importing_a_patch_ignores_invalid_lines_and_unknown_sections, {
     Synth synth;
-    Serializer serializer;
     std::string const patch = (
         "AM = 0.99\n"
         "[js80p]\n"
@@ -203,8 +199,7 @@ TEST(importing_a_patch_ignores_invalid_lines_and_unknown_sections, {
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA = 0.83\n"
     );
 
-    serializer.import(synth, patch);
-    synth.process_messages();
+    Serializer::import_patch_in_audio_thread(synth, patch);
 
     assert_eq(
         0.42, synth.get_param_ratio_atomic(Synth::ParamId::PM), DOUBLE_DELTA
@@ -236,14 +231,12 @@ TEST(importing_a_patch_ignores_invalid_lines_and_unknown_sections, {
 
 TEST(importing_a_patch_does_not_require_terminating_new_line, {
     Synth synth;
-    Serializer serializer;
     std::string const patch = (
         "[js80p]\n"
         "PM = 0.42"
     );
 
-    serializer.import(synth, patch);
-    synth.process_messages();
+    Serializer::import_patch_in_audio_thread(synth, patch);
 
     assert_eq(
         0.42, synth.get_param_ratio_atomic(Synth::ParamId::PM), DOUBLE_DELTA
@@ -253,14 +246,12 @@ TEST(importing_a_patch_does_not_require_terminating_new_line, {
 
 TEST(imported_values_are_clamped, {
     Synth synth;
-    Serializer serializer;
     std::string const patch = (
         "[js80p]\n"
         "PM = 2.1\n"
     );
 
-    serializer.import(synth, patch);
-    synth.process_messages();
+    Serializer::import_patch_in_audio_thread(synth, patch);
 
     assert_eq(
         1.0, synth.get_param_ratio_atomic(Synth::ParamId::PM), DOUBLE_DELTA
@@ -271,7 +262,6 @@ TEST(imported_values_are_clamped, {
 TEST(extremely_long_lines_may_be_truncated, {
     constexpr Integer spaces_count = Serializer::MAX_SIZE * 2 + 123;
     Synth synth;
-    Serializer serializer;
     std::string patch("[js80p]\n");
     std::string spaces(" ");
     std::string long_line("");
@@ -293,8 +283,7 @@ TEST(extremely_long_lines_may_be_truncated, {
         "MVOL = 0.42\n"
         "CVOL = 0.123\n"
     );
-    serializer.import(synth, patch);
-    synth.process_messages();
+    Serializer::import_patch_in_audio_thread(synth, patch);
 
     assert_eq(
         synth.get_param_default_ratio(Synth::ParamId::PM),
@@ -314,7 +303,6 @@ TEST(extremely_long_lines_may_be_truncated, {
 
 TEST(toggle_params_are_loaded_before_other_params, {
     Synth synth;
-    Serializer serializer;
     std::string const patch = (
         "[js80p]\n"
         "MF1FRQ = 0.75\n"
@@ -323,8 +311,7 @@ TEST(toggle_params_are_loaded_before_other_params, {
         "MF2FRQ = 0.75\n"
     );
 
-    serializer.import(synth, patch);
-    synth.process_messages();
+    Serializer::import_patch_in_audio_thread(synth, patch);
 
     assert_eq(
         ToggleParam::ON, synth.modulator_params.filter_1_log_scale.get_value(), DOUBLE_DELTA
@@ -343,7 +330,6 @@ TEST(toggle_params_are_loaded_before_other_params, {
 
 TEST(param_names_are_parsed_case_insensitively_and_converted_to_upper_case, {
     Synth synth;
-    Serializer serializer;
     std::string const patch = (
         "[js80p]\n"
         "cVol = 0.5\n"
@@ -356,8 +342,7 @@ TEST(param_names_are_parsed_case_insensitively_and_converted_to_upper_case, {
     std::string::const_iterator line_with_ctl_it = line_with_ctl.begin();
     std::string::const_iterator line_without_ctl_it = line_without_ctl.begin();
 
-    serializer.import(synth, patch);
-    synth.process_messages();
+    Serializer::import_patch_in_audio_thread(synth, patch);
 
     assert_eq(
         0.5, synth.get_param_ratio_atomic(Synth::ParamId::CVOL), DOUBLE_DELTA
@@ -382,7 +367,6 @@ TEST(param_names_are_parsed_case_insensitively_and_converted_to_upper_case, {
 
 TEST(params_which_are_missing_from_the_patch_are_cleared_and_reset_to_default, {
     Synth synth;
-    Serializer serializer;
     std::string const patch = (
         "[js80p]\n"
         "AM = 0.42\n"
@@ -411,9 +395,7 @@ TEST(params_which_are_missing_from_the_patch_are_cleared_and_reset_to_default, {
     synth.control_change(0.0, 0, Midi::MODULATION_WHEEL, 100);
     SignalProducer::produce<Synth>(synth, 2);
 
-    serializer.import(synth, patch);
-
-    SignalProducer::produce<Synth>(synth, 3);
+    Serializer::import_patch_in_audio_thread(synth, patch);
 
     assert_eq(
         0.42, synth.get_param_ratio_atomic(Synth::ParamId::AM), DOUBLE_DELTA
@@ -425,4 +407,136 @@ TEST(params_which_are_missing_from_the_patch_are_cleared_and_reset_to_default, {
     assert_eq(
         0.00, synth.get_param_ratio_atomic(Synth::ParamId::PM), DOUBLE_DELTA
     );
+})
+
+
+TEST(synth_message_queue_is_cleared_before_importing_patch_inside_audio_thread, {
+    Synth synth;
+    std::string const patch = (
+        "[js80p]\n"
+        "AM = 0.42\n"
+    );
+
+    synth.push_message(
+        Synth::MessageType::SET_PARAM, Synth::ParamId::AM, 0.123, 0
+    );
+    Serializer::import_patch_in_audio_thread(synth, patch);
+    SignalProducer::produce<Synth>(synth, 1);
+
+    assert_eq(
+        0.42, synth.get_param_ratio_atomic(Synth::ParamId::AM), DOUBLE_DELTA
+    );
+})
+
+
+TEST(can_import_patch_inside_the_gui_thread, {
+    Synth synth;
+    std::string const patch = (
+        "[js80p]\n"
+        "AM = 0.42\n"
+    );
+
+    synth.push_message(
+        Synth::MessageType::SET_PARAM, Synth::ParamId::FM, 0.123, 0
+    );
+    Serializer::import_patch_in_gui_thread(synth, patch);
+    SignalProducer::produce<Synth>(synth, 1);
+
+    assert_eq(
+        0.42, synth.get_param_ratio_atomic(Synth::ParamId::AM), DOUBLE_DELTA
+    );
+    assert_eq(
+        0.0, synth.get_param_ratio_atomic(Synth::ParamId::FM), DOUBLE_DELTA
+    );
+})
+
+
+void assert_trimmed(char const* expected, char const* raw_number)
+{
+    constexpr size_t buffer_size = 16;
+
+    char buffer[buffer_size];
+    int const length = snprintf(buffer, buffer_size, "%s", raw_number);
+
+    Serializer::trim_excess_zeros_from_end_after_snprintf(buffer, length, buffer_size);
+    assert_eq(expected, buffer);
+
+    if (strncmp(expected, raw_number, buffer_size) != 0) {
+        std::fill_n(buffer, buffer_size, '0');
+        int const terminating_zero = snprintf(buffer, buffer_size, "%s", expected);
+        buffer[terminating_zero] = '0';
+        buffer[buffer_size - 1] = '\x00';
+        Serializer::trim_excess_zeros_from_end_after_snprintf(buffer, 12345, buffer_size);
+        assert_eq(expected, buffer);
+    }
+
+    snprintf(buffer, buffer_size, "000");
+    Serializer::trim_excess_zeros_from_end_after_snprintf(buffer, -1, buffer_size);
+    assert_eq("000", buffer);
+}
+
+
+TEST(trimming_zeros_from_end_of_numbers, {
+    assert_trimmed("", "");
+    assert_trimmed("0", "0");
+    assert_trimmed("1", "1");
+    assert_trimmed("10", "10");
+    assert_trimmed("100", "100");
+    assert_trimmed("1000", "1000");
+    assert_trimmed("0.0", "0.0");
+    assert_trimmed("0.1", "0.1");
+    assert_trimmed("0.10", "0.10");
+    assert_trimmed("0.12", "0.12");
+    assert_trimmed("0.120", "0.120");
+    assert_trimmed("0.0", "0.00");
+    assert_trimmed("0.0", "0.00000");
+    assert_trimmed("0.120", "0.1200");
+    assert_trimmed("0.120", "0.120000");
+    assert_trimmed("0.120", "0.1200000000000");
+    assert_trimmed("0.1234567890123", "0.1234567890123");
+})
+
+
+TEST(trailing_zeros_and_none_controllers_and_params_with_default_values_are_omitted_from_serialized_patch, {
+    Synth synth;
+    std::string patch = "";
+
+    patch += "[js80p]";
+    patch += Serializer::LINE_END;
+    patch += "FM = 0.50";
+    patch += Serializer::LINE_END;
+
+    synth.push_message(
+        Synth::MessageType::CLEAR, Synth::ParamId::MAX_PARAM_ID, 0.0, 0
+    );
+    synth.push_message(
+        Synth::MessageType::SET_PARAM, Synth::ParamId::FM, 0.5, 0
+    );
+    synth.process_messages();
+
+    assert_eq(patch, Serializer::serialize(synth));
+})
+
+
+TEST(when_a_param_has_a_controller_then_its_own_value_is_omitted, {
+    Synth synth;
+    std::string patch = "";
+
+    patch += "[js80p]";
+    patch += Serializer::LINE_END;
+    patch += "FMctl = 0.50";
+    patch += Serializer::LINE_END;
+
+    synth.push_message(
+        Synth::MessageType::CLEAR, Synth::ParamId::MAX_PARAM_ID, 0.0, 0
+    );
+    synth.push_message(
+        Synth::MessageType::ASSIGN_CONTROLLER,
+        Synth::ParamId::FM,
+        0.0,
+        Synth::ControllerId::PITCH_WHEEL
+    );
+    synth.process_messages();
+
+    assert_eq(patch, Serializer::serialize(synth));
 })

@@ -87,7 +87,7 @@ void ImportPatchButton::import_patch(char const* buffer, Integer const size) con
         )
     );
 
-    Serializer::import(synth, patch);
+    Serializer::import_patch_in_gui_thread(synth, patch);
 
     synth_gui_body->stop_editing();
     synth_gui_body->refresh_param_editors();
@@ -306,7 +306,10 @@ void ControllerSelector::set_up(GUI::PlatformData platform_data, WidgetBase* par
     Widget::set_up(platform_data, parent);
 
     constexpr int max_top = HEIGHT - Controller::HEIGHT;
-    constexpr int group_separation = 10;
+    constexpr int group_separation = 3;
+
+    GUI::ControllerCapability previous_required_capability = GUI::ControllerCapability::NONE;
+    Synth::ControllerId previous_id = Synth::ControllerId::NONE;
     int top = TITLE_HEIGHT;
     int left = 10;
 
@@ -317,17 +320,23 @@ void ControllerSelector::set_up(GUI::PlatformData platform_data, WidgetBase* par
             GUI::CONTROLLERS[i].required_capability
         );
 
+        if (
+                required_capability != previous_required_capability
+                || previous_id == Synth::ControllerId::MIDI_LEARN
+        ) {
+            top += group_separation;
+            previous_required_capability = required_capability;
+        }
+
+        previous_id = id;
+
         controllers[i] = (Controller*)this->own(
             new Controller(*this, required_capability, text, left, top, id)
         );
 
         top += Controller::HEIGHT;
 
-        if (i == 0 || i == 4 || i == 5 || i == 75 || i == 95 || i == 103) {
-            top += group_separation;
-        }
-
-        if (top > max_top || i == 85) {
+        if (top > max_top) {
             top = TITLE_HEIGHT;
             left += Controller::WIDTH;
         }
@@ -1226,10 +1235,11 @@ ToggleSwitch::ToggleSwitch(
         int const left,
         int const top,
         int const width,
+        int const height,
         int const box_left,
         Synth& synth,
         Synth::ParamId const param_id
-) : TransparentWidget(text, left, top, width, HEIGHT, Type::PARAM_EDITOR),
+) : TransparentWidget(text, left, top, width, height, Type::PARAM_EDITOR),
     param_id(param_id),
     box_left(box_left),
     synth(synth),

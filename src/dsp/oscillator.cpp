@@ -30,7 +30,7 @@ namespace JS80P
 {
 
 template<class ModulatorSignalProducerClass, bool is_lfo>
-FloatParam Oscillator<ModulatorSignalProducerClass, is_lfo>::dummy_param("", 0.0, 0.0, 0.0);
+FloatParamS Oscillator<ModulatorSignalProducerClass, is_lfo>::dummy_param("", 0.0, 0.0, 0.0);
 
 template<class ModulatorSignalProducerClass, bool is_lfo>
 ToggleParam Oscillator<ModulatorSignalProducerClass, is_lfo>::dummy_toggle("", ToggleParam::OFF);
@@ -40,7 +40,7 @@ template<class ModulatorSignalProducerClass, bool is_lfo>
 Oscillator<ModulatorSignalProducerClass, is_lfo>::WaveformParam::WaveformParam(
         std::string const name,
         Waveform const max_value
-) noexcept : Param<Waveform>(name, SINE, max_value, SINE)
+) noexcept : Param<Waveform, ParamEvaluation::BLOCK>(name, SINE, max_value, SINE)
 {
 }
 
@@ -49,9 +49,9 @@ template<class ModulatorSignalProducerClass, bool is_lfo>
 Oscillator<ModulatorSignalProducerClass, is_lfo>::Oscillator(
         WaveformParam& waveform,
         ModulatorSignalProducerClass* modulator,
-        FloatParam& amplitude_modulation_level_leader,
-        FloatParam& frequency_modulation_level_leader,
-        FloatParam& phase_modulation_level_leader,
+        FloatParamS& amplitude_modulation_level_leader,
+        FloatParamS& frequency_modulation_level_leader,
+        FloatParamS& phase_modulation_level_leader,
         ToggleParam& tempo_sync,
         ToggleParam& center
 ) noexcept
@@ -182,9 +182,9 @@ void Oscillator<ModulatorSignalProducerClass, is_lfo>::initialize_instance() noe
 template<class ModulatorSignalProducerClass, bool is_lfo>
 Oscillator<ModulatorSignalProducerClass, is_lfo>::Oscillator(
         WaveformParam& waveform,
-        FloatParam& amplitude_leader,
-        FloatParam& frequency_leader,
-        FloatParam& phase_leader,
+        FloatParamS& amplitude_leader,
+        FloatParamS& frequency_leader,
+        FloatParamS& phase_leader,
         ToggleParam& tempo_sync,
         ToggleParam& center
 ) noexcept
@@ -226,23 +226,23 @@ Oscillator<ModulatorSignalProducerClass, is_lfo>::Oscillator(
 template<class ModulatorSignalProducerClass, bool is_lfo>
 Oscillator<ModulatorSignalProducerClass, is_lfo>::Oscillator(
         WaveformParam& waveform,
-        FloatParam& amplitude_leader,
-        FloatParam& detune_leader,
-        FloatParam& fine_detune_leader,
-        FloatParam& harmonic_0_leader,
-        FloatParam& harmonic_1_leader,
-        FloatParam& harmonic_2_leader,
-        FloatParam& harmonic_3_leader,
-        FloatParam& harmonic_4_leader,
-        FloatParam& harmonic_5_leader,
-        FloatParam& harmonic_6_leader,
-        FloatParam& harmonic_7_leader,
-        FloatParam& harmonic_8_leader,
-        FloatParam& harmonic_9_leader,
+        FloatParamS& amplitude_leader,
+        FloatParamS& detune_leader,
+        FloatParamS& fine_detune_leader,
+        FloatParamB& harmonic_0_leader,
+        FloatParamB& harmonic_1_leader,
+        FloatParamB& harmonic_2_leader,
+        FloatParamB& harmonic_3_leader,
+        FloatParamB& harmonic_4_leader,
+        FloatParamB& harmonic_5_leader,
+        FloatParamB& harmonic_6_leader,
+        FloatParamB& harmonic_7_leader,
+        FloatParamB& harmonic_8_leader,
+        FloatParamB& harmonic_9_leader,
         ModulatorSignalProducerClass* modulator,
-        FloatParam& amplitude_modulation_level_leader,
-        FloatParam& frequency_modulation_level_leader,
-        FloatParam& phase_modulation_level_leader
+        FloatParamS& amplitude_modulation_level_leader,
+        FloatParamS& frequency_modulation_level_leader,
+        FloatParamS& phase_modulation_level_leader
 ) noexcept
     : SignalProducer(1, NUMBER_OF_CHILDREN),
     waveform(waveform),
@@ -432,7 +432,9 @@ Sample const* const* Oscillator<ModulatorSignalProducerClass, is_lfo>::initializ
         Integer const round,
         Integer const sample_count
 ) noexcept {
-    apply_toggle_params<is_lfo>(bpm);
+    if constexpr (is_lfo) {
+        apply_toggle_params(bpm);
+    }
 
     Waveform const waveform = this->waveform.get_value();
 
@@ -452,7 +454,7 @@ Sample const* const* Oscillator<ModulatorSignalProducerClass, is_lfo>::initializ
                 has_changed = true;
             }
 
-            FloatParam::produce_if_not_constant(
+            FloatParamB::produce_if_not_constant(
                 *custom_waveform_params[i], round, sample_count
             );
         }
@@ -472,9 +474,8 @@ Sample const* const* Oscillator<ModulatorSignalProducerClass, is_lfo>::initializ
 
 
 template<class ModulatorSignalProducerClass, bool is_lfo>
-template<bool is_lfo_>
 void Oscillator<ModulatorSignalProducerClass, is_lfo>::apply_toggle_params(
-        typename std::enable_if<is_lfo_, Number const>::type bpm
+        Number const bpm
 ) noexcept {
     frequency_scale = (
         tempo_sync.get_value() == ToggleParam::ON
@@ -487,25 +488,17 @@ void Oscillator<ModulatorSignalProducerClass, is_lfo>::apply_toggle_params(
 
 
 template<class ModulatorSignalProducerClass, bool is_lfo>
-template<bool is_lfo_>
-void Oscillator<ModulatorSignalProducerClass, is_lfo>::apply_toggle_params(
-        typename std::enable_if<!is_lfo_, Number const>::type bpm
-) noexcept {
-}
-
-
-template<class ModulatorSignalProducerClass, bool is_lfo>
 void Oscillator<ModulatorSignalProducerClass, is_lfo>::compute_amplitude_buffer(
         Integer const round,
         Integer const sample_count
 ) noexcept {
     Sample const* modulated_amplitude_buffer = (
-        FloatParam::produce_if_not_constant<ModulatedFloatParam>(
+        FloatParamS::produce_if_not_constant<ModulatedFloatParam>(
             modulated_amplitude, round, sample_count
         )
     );
     Sample const* amplitude_buffer = (
-        FloatParam::produce_if_not_constant(amplitude, round, sample_count)
+        FloatParamS::produce_if_not_constant(amplitude, round, sample_count)
     );
 
     if (amplitude_buffer == NULL) {
@@ -560,15 +553,15 @@ void Oscillator<ModulatorSignalProducerClass, is_lfo>::compute_frequency_buffer(
     constexpr Byte ALL = FREQUENCY | DETUNE | FINE_DETUNE;
 
     Sample const* const frequency_buffer = (
-        FloatParam::produce_if_not_constant<ModulatedFloatParam>(
+        FloatParamS::produce_if_not_constant<ModulatedFloatParam>(
             frequency, round, sample_count
         )
     );
     Sample const* const detune_buffer = (
-        FloatParam::produce_if_not_constant(detune, round, sample_count)
+        FloatParamS::produce_if_not_constant(detune, round, sample_count)
     );
     Sample const* const fine_detune_buffer = (
-        FloatParam::produce_if_not_constant(fine_detune, round, sample_count)
+        FloatParamS::produce_if_not_constant(fine_detune, round, sample_count)
     );
 
     Byte const_param_flags = (
@@ -729,7 +722,7 @@ void Oscillator<ModulatorSignalProducerClass, is_lfo>::compute_phase_buffer(
         Integer const round,
         Integer const sample_count
 ) noexcept {
-    Sample const* const phase_buffer = FloatParam::produce_if_not_constant<ModulatedFloatParam>(
+    Sample const* const phase_buffer = FloatParamS::produce_if_not_constant<ModulatedFloatParam>(
         phase, round, sample_count
     );
     phase_is_constant = phase_buffer == NULL;
@@ -760,11 +753,59 @@ void Oscillator<ModulatorSignalProducerClass, is_lfo>::render(
     }
 
     if (computed_frequency_is_constant) {
-        render_with_constant_frequency(
+        Wavetable::Interpolation const interpolation = (
+            wavetable->select_interpolation(
+                frequency_scale * computed_frequency_value, nyquist_frequency
+            )
+        );
+
+        if (UNLIKELY(wavetable->has_single_partial())) {
+            switch (interpolation) {
+                case Wavetable::Interpolation::LINEAR_ONLY:
+                    render_with_constant_frequency<Wavetable::Interpolation::LINEAR_ONLY, true>(
+                        round, first_sample_index, last_sample_index, buffer
+                    );
+                    break;
+
+                case Wavetable::Interpolation::LAGRANGE_ONLY:
+                    render_with_constant_frequency<Wavetable::Interpolation::LAGRANGE_ONLY, true>(
+                        round, first_sample_index, last_sample_index, buffer
+                    );
+                    break;
+
+                default:
+                    render_with_constant_frequency<Wavetable::Interpolation::DYNAMIC, true>(
+                        round, first_sample_index, last_sample_index, buffer
+                    );
+                    break;
+            }
+        } else {
+            switch (interpolation) {
+                case Wavetable::Interpolation::LINEAR_ONLY:
+                    render_with_constant_frequency<Wavetable::Interpolation::LINEAR_ONLY, false>(
+                        round, first_sample_index, last_sample_index, buffer
+                    );
+                    break;
+
+                case Wavetable::Interpolation::LAGRANGE_ONLY:
+                    render_with_constant_frequency<Wavetable::Interpolation::LAGRANGE_ONLY, false>(
+                        round, first_sample_index, last_sample_index, buffer
+                    );
+                    break;
+
+                default:
+                    render_with_constant_frequency<Wavetable::Interpolation::DYNAMIC, false>(
+                        round, first_sample_index, last_sample_index, buffer
+                    );
+                    break;
+            }
+        }
+    } else if (UNLIKELY(wavetable->has_single_partial())) {
+        render_with_changing_frequency<true>(
             round, first_sample_index, last_sample_index, buffer
         );
     } else {
-        render_with_changing_frequency(
+        render_with_changing_frequency<false>(
             round, first_sample_index, last_sample_index, buffer
         );
     }
@@ -772,6 +813,7 @@ void Oscillator<ModulatorSignalProducerClass, is_lfo>::render(
 
 
 template<class ModulatorSignalProducerClass, bool is_lfo>
+template<Wavetable::Interpolation interpolation, bool single_partial>
 void Oscillator<ModulatorSignalProducerClass, is_lfo>::render_with_constant_frequency(
         Integer const round,
         Integer const first_sample_index,
@@ -787,13 +829,13 @@ void Oscillator<ModulatorSignalProducerClass, is_lfo>::render_with_constant_freq
             Sample const phase = phase_value;
 
             for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-                buffer[0][i] = render_sample<is_lfo>(
+                buffer[0][i] = render_sample<single_partial, interpolation>(
                     computed_amplitude_value, computed_frequency_value, phase
                 );
             }
         } else {
             for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-                buffer[0][i] = render_sample<is_lfo>(
+                buffer[0][i] = render_sample<single_partial, interpolation>(
                     computed_amplitude_value, computed_frequency_value, phase_buffer[i]
                 );
             }
@@ -801,13 +843,13 @@ void Oscillator<ModulatorSignalProducerClass, is_lfo>::render_with_constant_freq
     } else {
         if (phase_is_constant) {
             for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-                buffer[0][i] = render_sample<is_lfo>(
+                buffer[0][i] = render_sample<single_partial, interpolation>(
                     computed_amplitude_buffer[i], computed_frequency_value, phase_value
                 );
             }
         } else {
             for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-                buffer[0][i] = render_sample<is_lfo>(
+                buffer[0][i] = render_sample<single_partial, interpolation>(
                     computed_amplitude_buffer[i], computed_frequency_value, phase_buffer[i]
                 );
             }
@@ -817,6 +859,7 @@ void Oscillator<ModulatorSignalProducerClass, is_lfo>::render_with_constant_freq
 
 
 template<class ModulatorSignalProducerClass, bool is_lfo>
+template<bool single_partial>
 void Oscillator<ModulatorSignalProducerClass, is_lfo>::render_with_changing_frequency(
         Integer const round,
         Integer const first_sample_index,
@@ -839,13 +882,13 @@ void Oscillator<ModulatorSignalProducerClass, is_lfo>::render_with_changing_freq
             Sample const phase = phase_value;
 
             for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-                buffer[0][i] = render_sample<is_lfo>(
+                buffer[0][i] = render_sample<single_partial>(
                     amplitude_value, computed_frequency_buffer[i], phase
                 );
             }
         } else {
             for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-                buffer[0][i] = render_sample<is_lfo>(
+                buffer[0][i] = render_sample<single_partial>(
                     amplitude_value, computed_frequency_buffer[i], phase_buffer[i]
                 );
             }
@@ -853,13 +896,13 @@ void Oscillator<ModulatorSignalProducerClass, is_lfo>::render_with_changing_freq
     } else {
         if (phase_is_constant) {
             for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-                buffer[0][i] = render_sample<is_lfo>(
+                buffer[0][i] = render_sample<single_partial>(
                     computed_amplitude_buffer[i], computed_frequency_buffer[i], phase_value
                 );
             }
         } else {
             for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-                buffer[0][i] = render_sample<is_lfo>(
+                buffer[0][i] = render_sample<single_partial>(
                     computed_amplitude_buffer[i], computed_frequency_buffer[i], phase_buffer[i]
                 );
             }
@@ -869,33 +912,34 @@ void Oscillator<ModulatorSignalProducerClass, is_lfo>::render_with_changing_freq
 
 
 template<class ModulatorSignalProducerClass, bool is_lfo>
-template<bool is_lfo_>
+template<bool single_partial, Wavetable::Interpolation interpolation>
 Sample Oscillator<ModulatorSignalProducerClass, is_lfo>::render_sample(
-        typename std::enable_if<is_lfo_, Sample const>::type amplitude,
-        typename std::enable_if<is_lfo_, Sample const>::type frequency,
-        typename std::enable_if<is_lfo_, Sample const>::type phase
+        Sample const amplitude,
+        Sample const frequency,
+        Sample const phase
 ) noexcept {
-    /*
-    We could set a bool flag in apply_toggle_params() to indicate if the offset
-    has to be added, so no multiplication would be necessary, but in practice,
-    there doesn't seem to be a significant performance difference between the
-    two approaches.
-    */
+    if constexpr (is_lfo) {
+        /*
+        We could set a bool flag in apply_toggle_params() to indicate if the
+        offset has to be added, so no multiplication would be necessary, but in
+        practice, there doesn't seem to be a significant performance difference
+        between the two approaches.
 
-    return amplitude * sample_offset_scale + amplitude * wavetable->lookup(
-        wavetable_state, frequency * frequency_scale, phase
-    );
-}
+        Also, doing the addition first and then multiplying the sum by the
+        amplitude doesn't seem to make a difference either.
+        */
 
-
-template<class ModulatorSignalProducerClass, bool is_lfo>
-template<bool is_lfo_>
-Sample Oscillator<ModulatorSignalProducerClass, is_lfo>::render_sample(
-        typename std::enable_if<!is_lfo_, Sample const>::type amplitude,
-        typename std::enable_if<!is_lfo_, Sample const>::type frequency,
-        typename std::enable_if<!is_lfo_, Sample const>::type phase
-) noexcept {
-    return amplitude * wavetable->lookup(wavetable_state, frequency, phase);
+        return (
+            amplitude * sample_offset_scale
+            + amplitude * wavetable->lookup<interpolation, single_partial>(
+                wavetable_state, frequency * frequency_scale, phase
+            )
+        );
+    } else {
+        return amplitude * wavetable->lookup<interpolation, single_partial>(
+            wavetable_state, frequency, phase
+        );
+    }
 }
 
 
@@ -921,6 +965,10 @@ template<class ModulatorSignalProducerClass, bool is_lfo>
 void Oscillator<ModulatorSignalProducerClass, is_lfo>::handle_start_event(
         Event const& event
 ) noexcept {
+    if (is_on_) {
+        return;
+    }
+
     is_on_ = true;
     is_starting = true;
     start_time_offset = current_time - event.time_offset;

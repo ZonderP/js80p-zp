@@ -80,50 +80,6 @@ Vst3Plugin::Event::Event(
 }
 
 
-Vst3Plugin::Event::Event(Event const& event)
-    : time_offset(event.time_offset),
-    velocity_or_value(event.velocity_or_value),
-    type(event.type),
-    note_or_ctl(event.note_or_ctl)
-{
-}
-
-
-Vst3Plugin::Event::Event(Event const&& event)
-    : time_offset(event.time_offset),
-    velocity_or_value(event.velocity_or_value),
-    type(event.type),
-    note_or_ctl(event.note_or_ctl)
-{
-}
-
-
-Vst3Plugin::Event& Vst3Plugin::Event::operator=(Event const& event) noexcept
-{
-    if (this != &event) {
-        time_offset = event.time_offset;
-        velocity_or_value = event.velocity_or_value;
-        type = event.type;
-        note_or_ctl = event.note_or_ctl;
-    }
-
-    return *this;
-}
-
-
-Vst3Plugin::Event& Vst3Plugin::Event::operator=(Event const&& event) noexcept
-{
-    if (this != &event) {
-        time_offset = event.time_offset;
-        velocity_or_value = event.velocity_or_value;
-        type = event.type;
-        note_or_ctl = event.note_or_ctl;
-    }
-
-    return *this;
-}
-
-
 bool Vst3Plugin::Event::operator<(Event const& event) const noexcept
 {
     return time_offset < event.time_offset;
@@ -286,7 +242,10 @@ tresult PLUGIN_API Vst3Plugin::Processor::process(Vst::ProcessData& data)
 
     if (bank != NULL && need_to_load_new_program) {
         need_to_load_new_program = false;
-        import_patch((*bank)[new_program].serialize());
+        Serializer::import_patch_in_audio_thread(
+            synth,
+            (*bank)[new_program].serialize()
+        );
     }
 
     if (data.numOutputs == 0 || data.numSamples < 1) {
@@ -546,12 +505,12 @@ void Vst3Plugin::Processor::update_bpm(Vst::ProcessData& data) noexcept
 void Vst3Plugin::Processor::generate_samples(Vst::ProcessData& data) noexcept
 {
     if (processSetup.symbolicSampleSize == Vst::SymbolicSampleSizes::kSample64) {
-        renderer.write_next_round<double>(
+        renderer.render<double>(
             (Integer)data.numSamples,
             (double**)getChannelBuffersPointer(processSetup, data.outputs[0])
         );
     } else if (processSetup.symbolicSampleSize == Vst::SymbolicSampleSizes::kSample32) {
-        renderer.write_next_round<float>(
+        renderer.render<float>(
             (Integer)data.numSamples,
             (float**)getChannelBuffersPointer(processSetup, data.outputs[0])
         );
@@ -573,17 +532,9 @@ tresult PLUGIN_API Vst3Plugin::Processor::setState(IBStream* state)
         return kResultFalse;
     }
 
-    import_patch(read_stream(state));
+    Serializer::import_patch_in_gui_thread(synth, read_stream(state));
 
     return kResultOk;
-}
-
-
-void Vst3Plugin::Processor::import_patch(std::string const& serialized) noexcept
-{
-    synth.process_messages();
-    Serializer::import(synth, serialized);
-    synth.process_messages();
 }
 
 

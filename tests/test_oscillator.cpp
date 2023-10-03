@@ -24,8 +24,8 @@
 #include "js80p.hpp"
 
 #include "dsp/envelope.cpp"
-#include "dsp/flexible_controller.cpp"
 #include "dsp/lfo.cpp"
+#include "dsp/macro.cpp"
 #include "dsp/math.cpp"
 #include "dsp/midi_controller.cpp"
 #include "dsp/oscillator.cpp"
@@ -447,6 +447,47 @@ TEST(oscillator_can_be_started_and_stopped_between_samples, {
     oscillator.frequency.set_value((Number)frequency);
     oscillator.start((Seconds)(1.0 - time_offset));
     oscillator.stop((Seconds)(2.0 - time_offset - sample_period));
+
+    block = SignalProducer::produce<SimpleOscillator>(oscillator, 1, block_size);
+    assert_eq(expected_samples[0], block[0], block_size, DOUBLE_DELTA);
+
+    block = SignalProducer::produce<SimpleOscillator>(oscillator, 2, block_size);
+    assert_eq(expected_samples[1], block[0], block_size, DOUBLE_DELTA);
+})
+
+
+TEST(repeated_start_and_stop_calls_are_ignored, {
+    constexpr Sample frequency = 1.0;
+    constexpr Frequency sample_rate = 6.0;
+    constexpr Integer block_size = 6;
+    constexpr Sample sample_period = 1.0 / (Seconds)sample_rate;
+    constexpr Sample time_offset = 0.5 * sample_period;
+    constexpr Sample pi_double = (Sample)Math::PI_DOUBLE;
+    Sample const* const* block;
+    Sample expected_samples[2][block_size] = {
+        {0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+        {
+            /* sin(2 * pi * frequency * time) */
+            std::sin(pi_double * frequency * (0.0 * sample_period + time_offset)),
+            std::sin(pi_double * frequency * (1.0 * sample_period + time_offset)),
+            std::sin(pi_double * frequency * (2.0 * sample_period + time_offset)),
+            std::sin(pi_double * frequency * (3.0 * sample_period + time_offset)),
+            std::sin(pi_double * frequency * (4.0 * sample_period + time_offset)),
+            0.0,
+        },
+    };
+
+    SimpleOscillator::WaveformParam waveform("");
+    SimpleOscillator oscillator(waveform);
+
+    oscillator.set_block_size(block_size);
+    oscillator.set_sample_rate(sample_rate);
+    oscillator.waveform.set_value(SimpleOscillator::SINE);
+    oscillator.frequency.set_value((Number)frequency);
+    oscillator.start(1.0 - time_offset);
+    oscillator.start(0.42);
+    oscillator.stop(2.0 - time_offset - sample_period);
+    oscillator.stop(1.23);
 
     block = SignalProducer::produce<SimpleOscillator>(oscillator, 1, block_size);
     assert_eq(expected_samples[0], block[0], block_size, DOUBLE_DELTA);
@@ -878,8 +919,8 @@ TEST(amplitude_modulation_creates_two_sidebands, {
         -0.001
     );
 
-    FloatParam dummy_param("", 0.0, 1.0, 0.0);
-    FloatParam modulation_level("", 0.0, 1.0, 0.7);
+    FloatParamS dummy_param("", 0.0, 1.0, 0.0);
+    FloatParamS modulation_level("", 0.0, 1.0, 0.7);
 
     Modulator::WaveformParam modulator_waveform("");
     Modulator modulator(modulator_waveform);
@@ -942,8 +983,8 @@ TEST(frequency_may_be_modulated, {
 
     SumOfSines expected(1.0, 1000.0, 0.0, 0.0, 0.0, 0.0, 1, -0.000025);
 
-    FloatParam dummy_param("", 0.0, 1.0, 0.0);
-    FloatParam modulation_level("", 0.0, 1.0, 0.5);
+    FloatParamS dummy_param("", 0.0, 1.0, 0.0);
+    FloatParamS modulation_level("", 0.0, 1.0, 0.5);
 
     Modulator modulator(500.0);
 
@@ -1040,7 +1081,7 @@ TEST(phase_can_be_controlled, {
 TEST(can_skip_a_round_without_rendering, {
     constexpr Integer block_size = 2048;
     constexpr Frequency frequency = 440.0;
-    SumOfSines zero(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1);
+    Constant zero(0.0);
     SumOfSines sine(1.0, frequency, 0.0, 0.0, 0.0, 0.0, 1);
     SimpleOscillator::WaveformParam waveform_param("");
     SimpleOscillator oscillator(waveform_param);
@@ -1061,7 +1102,7 @@ TEST(can_skip_a_round_without_rendering, {
 
     oscillator.skip_round(1, block_size);
     oscillator.skip_round(1, block_size);
-    render_rounds<SumOfSines>(zero, expected_samples, 1, block_size, 1);
+    render_rounds<Constant>(zero, expected_samples, 1, block_size, 1);
     render_rounds<SimpleOscillator>(
         oscillator, rendered_samples, 1, block_size, 1
     );

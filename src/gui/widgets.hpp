@@ -470,7 +470,9 @@ class AboutText : public Widget
         static constexpr char const* NAME = "JS80P";
 
         static constexpr char const* VERSION = (
-            JS80P_TO_STRING(JS80P_VERSION_STR) ", " JS80P_TO_STRING(JS80P_TARGET_PLATFORM)
+            JS80P_TO_STRING(JS80P_VERSION_STR) ", "
+            JS80P_TO_STRING(JS80P_TARGET_PLATFORM) ", "
+            JS80P_TO_STRING(JS80P_INSTRUCTION_SET)
         );
 
         static constexpr char const* TEXT = (
@@ -530,14 +532,13 @@ class StatusLine : public TransparentWidget
 class ToggleSwitch : public TransparentWidget
 {
     public:
-        static constexpr int HEIGHT = 24;
-
         ToggleSwitch(
             GUI& gui,
             char const* const text,
             int const left,
             int const top,
             int const width,
+            int const height,
             int const box_left,
             Synth& synth,
             Synth::ParamId const param_id

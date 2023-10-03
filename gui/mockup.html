@@ -61,13 +61,20 @@ html, body {
 }
 
 #distortion-params,
-#overdrive-params {
-  width: 90px;
+#overdrive-params,
+#volume-1-params,
+#volume-2-params,
+#volume-3-params {
+  width: 64px;
   text-align: center;
 }
 
+#volume-1, #overdrive, #distortion, #filter-1, #filter-2, #volume-2 {
+  margin-top: 1px;
+}
+
 #effects .main-block {
-  padding: 2px;
+  padding: 2px 2px 1px 2px;
 }
 
 #main {
@@ -81,7 +88,7 @@ html, body {
 }
 
 #main .knob {
-  margin-top: 6px;
+  margin-top: 1px;
 }
 
 .block {
@@ -179,6 +186,7 @@ h1 {
   font-weight: bold;
 }
 
+#main div label,
 .block h1 label {
   display: inline-block;
   height: 16px;
@@ -194,14 +202,19 @@ h1 {
 }
 
 #chorus h1 label.freq {
-  left: 191px;
+  left: 250px;
 }
 
 #echo h1 label.freq {
   left: 94px;
 }
 
+#reverb h1 label.freq {
+  left: 76px;
+}
+
 .block h1 label.dynamic,
+.block h1 label.poly,
 .block h1 label.sync {
   margin-right: 3px;
   float: right;
@@ -213,6 +226,7 @@ h1 {
   margin-top: 2px;
 }
 
+#main div input,
 .block h1 input {
   position: relative;
   background-color: black;
@@ -298,14 +312,14 @@ body.hide-objects .knob span:nth-child(4) {
 .tab {
   position: relative;
   display: inline-block;
-  font-family: Verdana, Sans-serif;
+  font-family: Arial, Sans-serif;
   font-size: 14px;
   background: #202030;
-  width: 83px;
+  width: 89px;
   height: 20px;
-  line-height: 20px;
+  line-height: 22px;
   margin: 0;
-  padding: 2px 6px;
+  padding: 2px 3px;
   border: solid 2px #5c5c60;
   border-radius: 6px 6px 0 0;
   margin-bottom: -4px;
@@ -334,7 +348,7 @@ body.hide-objects .knob span:nth-child(4) {
 }
 
 #export-import {
-  height: 27px;
+  height: 25px;
   text-align: center;
 }
 
@@ -357,17 +371,12 @@ svg.icon {
 
 .effect {
   text-align: center;
-  margin: 24px 28px;
+  margin: 1.5px 10px;
   padding: 2px 6px;
 }
 
 .effect h1 {
   text-align: left;
-}
-
-#echo, #reverb {
-  margin: 24px 12px;
-  padding: 2px 6px;
 }
 
 .border > span {
@@ -464,8 +473,8 @@ function make_tabs(active)
     var tabs = [
             "Synth",
             "Effects",
-            "Ctls 1-10",
-            "Ctls 11-20",
+            "Macros 1-10",
+            "Macros 11-20",
             "Envelopes",
             "LFOs",
             "About"
@@ -524,6 +533,9 @@ function make_tabs(active)
            </g>
           </svg>
         </div>
+        <div>
+          <label class="poly"><input type="text" /> POLY</label>
+        </div>
       </div>
       <div id="osc-1" class="osc main-block block">
         <h1>Oscillator 1 (modulator)</h1>
@@ -571,27 +583,39 @@ function make_tabs(active)
       <script type="text/javascript">make_tabs(1);</script>
     </div>
     <div class="border" id="effects">
+      <div id="volume-1" class="effect main-block block">
+        <h1>
+          Vol 1
+        </h1>
+        <div id="volume-1-params" class="block"></div>
+      </div>
       <div id="overdrive" class="effect main-block block">
-        <h1>Overdrive</h1>
+        <h1>Odrv</h1>
         <div id="overdrive-params" class="block"></div>
       </div>
       <div id="distortion" class="effect main-block block">
-        <h1>Distortion</h1>
+        <h1>Dist</h1>
         <div id="distortion-params" class="block"></div>
       </div>
-      <div id="low-shelf" class="effect main-block block">
+      <div id="filter-1" class="effect main-block block">
         <h1>
           Filter 1
           <label class="freq"><input type="text" /> LOG FREQ</label>
         </h1>
-        <div id="low-shelf-params" class="block"></div>
+        <div id="filter-1-params" class="block"></div>
       </div>
-      <div id="high-shelf" class="effect main-block block">
+      <div id="filter-2" class="effect main-block block">
         <h1>
           Filter 2
           <label class="freq"><input type="text" /> LOG FREQ</label>
         </h1>
-        <div id="high-shelf-params" class="block"></div>
+        <div id="filter-2-params" class="block"></div>
+      </div>
+      <div id="volume-2" class="effect main-block block">
+        <h1>
+          Vol 2
+        </h1>
+        <div id="volume-2-params" class="block"></div>
       </div>
       <div id="chorus" class="effect main-block block">
         <h1>
@@ -615,6 +639,12 @@ function make_tabs(active)
           <label class="freq"><input type="text" /> LOG FREQS</label>
         </h1>
         <div id="reverb-params" class="block"></div>
+      </div>
+      <div id="volume-3" class="effect main-block block">
+        <h1>
+          Vol 3
+        </h1>
+        <div id="volume-3-params" class="block"></div>
       </div>
     </div>
   </div>
@@ -758,20 +788,25 @@ window.onload = function ()
         }
     }
 
+    create_knob("volume-1-params", "VOL %", "1.0");
+
     create_knob("overdrive-params", "GAIN %", "50");
 
     create_knob("distortion-params", "GAIN %", "50");
 
-    create_knob("low-shelf-params", "TYPE", "low-shelf");
-    create_knob("low-shelf-params", "FREQ Hz", "2000");
-    create_knob("low-shelf-params", "Q", "1.0");
-    create_knob("low-shelf-params", "GAIN dB", "-12.0");
+    create_knob("filter-1-params", "TYPE", "low-shelf");
+    create_knob("filter-1-params", "FREQ Hz", "2000");
+    create_knob("filter-1-params", "Q", "1.0");
+    create_knob("filter-1-params", "GAIN dB", "-12.0");
 
-    create_knob("high-shelf-params", "TYPE", "high-shelf");
-    create_knob("high-shelf-params", "FREQ Hz", "200");
-    create_knob("high-shelf-params", "Q", "1.0");
-    create_knob("high-shelf-params", "GAIN dB", "0.0");
+    create_knob("filter-2-params", "TYPE", "high-shelf");
+    create_knob("filter-2-params", "FREQ Hz", "200");
+    create_knob("filter-2-params", "Q", "1.0");
+    create_knob("filter-2-params", "GAIN dB", "0.0");
 
+    create_knob("volume-2-params", "VOL %", "1.0");
+
+    create_knob("chorus-params", "TYPE", "0");
     create_knob("chorus-params", "DEL s", "0.5");
     create_knob("chorus-params", "FRQ Hz", "1.5");
     create_knob("chorus-params", "DPT %", "0.5");
@@ -789,16 +824,27 @@ window.onload = function ()
     create_knob("echo-params", "DG dB", "-6");
     create_knob("echo-params", "WID %", "-100");
     create_knob("echo-params", "HP Hz", "100");
+    create_knob("echo-params", "CTH dB", "-30");
+    create_knob("echo-params", "CATK s", "0.0");
+    create_knob("echo-params", "CREL s", "0.0");
+    create_knob("echo-params", "CR 1:x", "-6.0");
     create_knob("echo-params", "WET %", "50");
     create_knob("echo-params", "DRY %", "60");
 
+    create_knob("reverb-params", "TYPE", "0");
     create_knob("reverb-params", "ROOM %", "90");
     create_knob("reverb-params", "DF Hz", "6000");
     create_knob("reverb-params", "DG dB", "-6");
     create_knob("reverb-params", "WID %", "-100");
     create_knob("reverb-params", "HP Hz", "100");
+    create_knob("reverb-params", "CTH db", "-30");
+    create_knob("reverb-params", "CATK s", "0.0");
+    create_knob("reverb-params", "CREL s", "0.0");
+    create_knob("reverb-params", "CR 1:x", "-6.0");
     create_knob("reverb-params", "WET %", "50");
     create_knob("reverb-params", "DRY %", "60");
+
+    create_knob("volume-3-params", "VOL %", "1.0");
 
     for (o = 0; o <= 1; ++o) {
         for (i = 1; i <= 10; ++i) {
@@ -811,7 +857,7 @@ window.onload = function ()
             k3 = document.createElement("div");
             k3.setAttribute("class", "group");
             h = document.createElement("h1");
-            h.innerHTML = "Flexible Controller " + String(o * 10 + i);
+            h.innerHTML = "Macro " + String(o * 10 + i);
             d.appendChild(h);
             k1.appendChild(k2);
             k1.appendChild(k3);

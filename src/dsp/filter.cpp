@@ -40,12 +40,22 @@ Filter<InputSignalProducerClass>::Filter(
 
 template<class InputSignalProducerClass>
 Sample const* const* Filter<InputSignalProducerClass>::initialize_rendering(
-    Integer const round,
-    Integer const sample_count
+        Integer const round,
+        Integer const sample_count
 ) noexcept {
     input_buffer = SignalProducer::produce<InputSignalProducerClass>(
         input, round, sample_count
     );
+
+    return input_buffer;
+}
+
+
+template<class InputSignalProducerClass>
+Sample const* const* Filter<InputSignalProducerClass>::input_was_silent(
+        Integer const round
+) noexcept {
+    mark_round_as_silent(round);
 
     return input_buffer;
 }

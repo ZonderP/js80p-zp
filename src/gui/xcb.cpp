@@ -180,7 +180,7 @@ char const* const XcbPlatform::KDIALOG_SAVE_ARGUMENTS[] = {
     "--title",
     "Save As",
     ".",
-    "JS80P Patches (*.js80p)\nAll Files (*.*)",
+    "JS80P Patches (*.js80p)\nAll Files (*)",
     NULL,
 };
 
@@ -189,7 +189,7 @@ char const* const XcbPlatform::KDIALOG_OPEN_ARGUMENTS[] = {
     "--title",
     "Open",
     ".",
-    "JS80P Patches (*.js80p)\nAll Files (*.*)",
+    "JS80P Patches (*.js80p)\nAll Files (*)",
     NULL,
 };
 
@@ -206,7 +206,7 @@ char const* const XcbPlatform::ZENITY_SAVE_ARGUMENTS[] = {
     "--confirm-overwrite",
     "--title=Save As",
     "--file-filter=JS80P Patches (*.js80p) | *.js80p",
-    "--file-filter=All Files (*.*) | *.*",
+    "--file-filter=All Files (*) | *",
     NULL,
 };
 
@@ -214,7 +214,7 @@ char const* const XcbPlatform::ZENITY_OPEN_ARGUMENTS[] = {
     "--file-selection",
     "--title=Open",
     "--file-filter=JS80P Patches (*.js80p) | *.js80p",
-    "--file-filter=All Files (*.*) | *.*",
+    "--file-filter=All Files (*) | *",
     NULL,
 };
 
@@ -1321,19 +1321,19 @@ void Widget::set_up(GUI::PlatformData platform_data, WidgetBase* parent)
     );
 
     xcb_create_window(
-        xcb_connection,                     // c
-        XCB_COPY_FROM_PARENT,               // depth
-        window_id,                          // wid
-        parent_id,                          // parent
-        left,                               // x
-        top,                                // y
-        width,                              // width
-        height,                             // height
-        0,                                  // border_width
-        XCB_WINDOW_CLASS_INPUT_OUTPUT,      // class
-        XCB_COPY_FROM_PARENT,               // visual
-        XCB_CW_EVENT_MASK,                  // value_mask
-        &event_mask                         // value_list
+        xcb_connection,                     /* c            */
+        XCB_COPY_FROM_PARENT,               /* depth        */
+        window_id,                          /* wid          */
+        parent_id,                          /* parent       */
+        left,                               /* x            */
+        top,                                /* y            */
+        width,                              /* width        */
+        height,                             /* height       */
+        0,                                  /* border_width */
+        XCB_WINDOW_CLASS_INPUT_OUTPUT,      /* class        */
+        XCB_COPY_FROM_PARENT,               /* visual       */
+        XCB_CW_EVENT_MASK,                  /* value_mask   */
+        &event_mask                         /* value_list   */
     );
 
     cairo_surface = cairo_xcb_surface_create(

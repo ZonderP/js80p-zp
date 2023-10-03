@@ -27,15 +27,17 @@
 namespace JS80P
 {
 
-template<typename NumberType>
-Param<NumberType>::Param(
+template<typename NumberType, ParamEvaluation evaluation>
+Param<NumberType, evaluation>::Param(
         std::string const name,
         NumberType const min_value,
         NumberType const max_value,
         NumberType const default_value
 ) noexcept
-    : SignalProducer(1),
+    : SignalProducer(evaluation == ParamEvaluation::SAMPLE ? 1 : 0),
     midi_controller(NULL),
+    macro(NULL),
+    macro_change_index(-1),
     name(name),
     min_value(min_value),
     max_value(max_value),
@@ -48,54 +50,65 @@ Param<NumberType>::Param(
 }
 
 
-template<typename NumberType>
-std::string const& Param<NumberType>::get_name() const noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+ParamEvaluation Param<NumberType, evaluation>::get_evaluation() const noexcept
+{
+    return evaluation;
+}
+
+
+template<typename NumberType, ParamEvaluation evaluation>
+std::string const& Param<NumberType, evaluation>::get_name() const noexcept
 {
     return name;
 }
 
 
-template<typename NumberType>
-NumberType Param<NumberType>::get_default_value() const noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+NumberType Param<NumberType, evaluation>::get_default_value() const noexcept
 {
     return default_value;
 }
 
 
-template<typename NumberType>
-NumberType Param<NumberType>::get_value() const noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+NumberType Param<NumberType, evaluation>::get_value() const noexcept
 {
     if (midi_controller != NULL) {
         return ratio_to_value(midi_controller->get_value());
+    } else if (this->macro != NULL) {
+        this->macro->update();
+
+        return ratio_to_value(this->macro->get_value());
     }
 
     return value;
 }
 
 
-template<typename NumberType>
-NumberType Param<NumberType>::get_min_value() const noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+NumberType Param<NumberType, evaluation>::get_min_value() const noexcept
 {
     return min_value;
 }
 
 
-template<typename NumberType>
-NumberType Param<NumberType>::get_max_value() const noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+NumberType Param<NumberType, evaluation>::get_max_value() const noexcept
 {
     return max_value;
 }
 
 
-template<typename NumberType>
-void Param<NumberType>::set_value(NumberType const new_value) noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+void Param<NumberType, evaluation>::set_value(NumberType const new_value) noexcept
 {
     store_new_value(clamp(new_value));
 }
 
 
-template<typename NumberType>
-void Param<NumberType>::store_new_value(NumberType const new_value) noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+void Param<NumberType, evaluation>::store_new_value(NumberType const new_value) noexcept
 {
     value = new_value;
     ++change_index;
@@ -103,99 +116,169 @@ void Param<NumberType>::store_new_value(NumberType const new_value) noexcept
 }
 
 
-template<typename NumberType>
-NumberType Param<NumberType>::get_raw_value() const noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+NumberType Param<NumberType, evaluation>::get_raw_value() const noexcept
 {
     return value;
 }
 
 
-template<typename NumberType>
-NumberType Param<NumberType>::clamp(NumberType const value) const noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+NumberType Param<NumberType, evaluation>::clamp(NumberType const value) const noexcept
 {
     return std::min(max_value, std::max(min_value, value));
 }
 
 
-template<typename NumberType>
-Number Param<NumberType>::get_ratio() const noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+Number Param<NumberType, evaluation>::get_ratio() const noexcept
 {
     if (midi_controller != NULL) {
         return midi_controller->get_value();
+    } else if (this->macro != NULL) {
+        this->macro->update();
+
+        return this->macro->get_value();
     }
 
     return std::min(1.0, std::max(0.0, value_to_ratio(value)));
 }
 
 
-template<typename NumberType>
-Number Param<NumberType>::get_default_ratio() const noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+Number Param<NumberType, evaluation>::get_default_ratio() const noexcept
 {
     return value_to_ratio(get_default_value());
 }
 
 
-template<typename NumberType>
-void Param<NumberType>::set_ratio(Number const ratio) noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+void Param<NumberType, evaluation>::set_ratio(Number const ratio) noexcept
 {
     store_new_value(ratio_to_value(ratio));
 }
 
 
-template<typename NumberType>
-Integer Param<NumberType>::get_change_index() const noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+Integer Param<NumberType, evaluation>::get_change_index() const noexcept
 {
     if (midi_controller != NULL) {
         return midi_controller->get_change_index();
+    } else if (this->macro != NULL) {
+        this->macro->update();
+
+        return this->macro->get_change_index();
     }
 
     return change_index;
 }
 
 
-template<typename NumberType>
-NumberType Param<NumberType>::ratio_to_value(Number const ratio) const noexcept
-{
-    if (std::is_floating_point<NumberType>::value) {
+template<typename NumberType, ParamEvaluation evaluation>
+NumberType Param<NumberType, evaluation>::ratio_to_value(
+        Number const ratio
+) const noexcept {
+    if constexpr (std::is_floating_point<NumberType>::value) {
         return clamp(min_value + (NumberType)((Number)range * ratio));
+    } else {
+        return clamp(min_value + (NumberType)std::round((Number)range * ratio));
     }
-
-    return clamp(min_value + (NumberType)std::round((Number)range * ratio));
 }
 
 
-template<typename NumberType>
-Number Param<NumberType>::value_to_ratio(NumberType const value) const noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+Number Param<NumberType, evaluation>::value_to_ratio(NumberType const value) const noexcept
 {
     return ((Number)value - (Number)min_value) * range_inv;
 }
 
 
-template<typename NumberType>
-void Param<NumberType>::set_midi_controller(
-        MidiController const* midi_controller
+template<typename NumberType, ParamEvaluation evaluation>
+void Param<NumberType, evaluation>::set_midi_controller(
+        MidiController* midi_controller
 ) noexcept {
-    if (midi_controller == NULL) {
-        if (this->midi_controller != NULL) {
-            set_value(ratio_to_value(this->midi_controller->get_value()));
-        }
-    } else {
-        set_value(ratio_to_value(midi_controller->get_value()));
-    }
-
-    this->midi_controller = midi_controller;
+    set_midi_controller< Param<NumberType, evaluation> >(*this, midi_controller);
 }
 
 
-template<typename NumberType>
-MidiController const* Param<NumberType>::get_midi_controller() const noexcept
+template<typename NumberType, ParamEvaluation evaluation>
+template<class ParamClass>
+void Param<NumberType, evaluation>::set_midi_controller(
+        ParamClass& param,
+        MidiController* midi_controller
+) noexcept {
+    MidiController* old_midi_controller = param.get_midi_controller();
+
+    if (old_midi_controller != NULL) {
+        old_midi_controller->released();
+
+        if (midi_controller == NULL) {
+            param.set_value(
+                param.ratio_to_value(old_midi_controller->get_value())
+            );
+        }
+    }
+
+    if (midi_controller != NULL) {
+        midi_controller->assigned();
+        param.set_value(param.ratio_to_value(midi_controller->get_value()));
+    }
+
+    param.midi_controller = midi_controller;
+}
+
+
+template<typename NumberType, ParamEvaluation evaluation>
+MidiController* Param<NumberType, evaluation>::get_midi_controller() const noexcept
 {
     return midi_controller;
 }
 
 
-template<typename NumberType>
-void Param<NumberType>::render(
+template<typename NumberType, ParamEvaluation evaluation>
+void Param<NumberType, evaluation>::set_macro(Macro* macro) noexcept
+{
+    set_macro< Param<NumberType, evaluation> >(*this, macro);
+}
+
+
+template<typename NumberType, ParamEvaluation evaluation>
+template<class ParamClass>
+void Param<NumberType, evaluation>::set_macro(
+        ParamClass& param,
+        Macro* macro
+) noexcept {
+    Macro* old_macro = param.get_macro();
+
+    if (old_macro != NULL) {
+        if (macro == NULL) {
+            old_macro->update();
+            param.set_value(param.ratio_to_value(old_macro->get_value()));
+        }
+
+        old_macro->released();
+    }
+
+    if (macro != NULL) {
+        macro->assigned();
+        macro->update();
+        param.set_value(param.ratio_to_value(macro->get_value()));
+        param.macro_change_index = macro->get_change_index();
+    }
+
+    param.macro = macro;
+}
+
+
+template<typename NumberType, ParamEvaluation evaluation>
+Macro* Param<NumberType, evaluation>::get_macro() const noexcept
+{
+    return macro;
+}
+
+
+template<typename NumberType, ParamEvaluation evaluation>
+void Param<NumberType, evaluation>::render(
         Integer const round,
         Integer const first_sample_index,
         Integer const last_sample_index,
@@ -203,20 +286,23 @@ void Param<NumberType>::render(
 ) noexcept {
     Sample const value = (Sample)this->value;
 
-    for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-        buffer[0][i] = value;
+    for (Integer c = 0; c != channels; ++c) {
+        for (Integer i = first_sample_index; i != last_sample_index; ++i) {
+            buffer[c][i] = value;
+        }
     }
 }
 
 
 ToggleParam::ToggleParam(std::string const name, Toggle const default_value)
-    : Param<Toggle>(name, OFF, ON, default_value)
+    : Param<Toggle, ParamEvaluation::BLOCK>(name, OFF, ON, default_value)
 {
 }
 
 
+template<ParamEvaluation evaluation>
 template<class FloatParamClass>
-Sample const* const* FloatParam::produce(
+Sample const* const* FloatParam<evaluation>::produce(
         FloatParamClass& float_param,
         Integer const round,
         Integer const sample_count
@@ -228,7 +314,7 @@ Sample const* const* FloatParam::produce(
     }
 
     if (float_param.is_following_leader()) {
-        return SignalProducer::produce<FloatParam>(
+        return SignalProducer::produce< FloatParam<evaluation> >(
             *float_param.leader, round, sample_count
         );
     }
@@ -239,8 +325,9 @@ Sample const* const* FloatParam::produce(
 }
 
 
+template<ParamEvaluation evaluation>
 template<class FloatParamClass>
-Sample const* FloatParam::produce_if_not_constant(
+Sample const* FloatParam<evaluation>::produce_if_not_constant(
         FloatParamClass& float_param,
         Integer const round,
         Integer const sample_count
@@ -251,13 +338,26 @@ Sample const* FloatParam::produce_if_not_constant(
         return NULL;
     }
 
-    return FloatParam::produce<FloatParamClass>(
-        float_param, round, sample_count
-    )[0];
+    Sample const* const* const rendered = (
+        FloatParam<evaluation>::produce<FloatParamClass>(
+            float_param, round, sample_count
+        )
+    );
+
+    if (rendered == NULL) {
+        return NULL;
+    }
+
+    return (
+        float_param.get_evaluation() == ParamEvaluation::SAMPLE
+            ? rendered[0]
+            : NULL
+    );
 }
 
 
-FloatParam::FloatParam(
+template<ParamEvaluation evaluation>
+FloatParam<evaluation>::FloatParam(
         std::string const name,
         Number const min_value,
         Number const max_value,
@@ -265,29 +365,31 @@ FloatParam::FloatParam(
         Number const round_to,
         ToggleParam const* log_scale_toggle,
         Number const* log_scale_table,
-        Number const* log_scale_inv_table,
         int const log_scale_table_max_index,
-        Number const log_scale_table_scale,
-        Number const log_scale_inv_table_scale
+        Number const log_scale_table_scale
 ) noexcept
-    : Param<Number>(name, min_value, max_value, default_value),
+    : Param<Number, evaluation>(name, min_value, max_value, default_value),
     log_scale_toggle(log_scale_toggle),
     log_scale_table(log_scale_table),
-    log_scale_inv_table(log_scale_inv_table),
     log_scale_table_max_index(log_scale_table_max_index),
     log_scale_table_scale(log_scale_table_scale),
-    log_scale_inv_table_scale(log_scale_inv_table_scale),
+    log_min_minus(log_scale_toggle != NULL ? -std::log2(min_value) : 0.0),
+    log_range_inv(
+        log_scale_toggle != NULL
+            ? 1.0 / (std::log2(max_value) + log_min_minus)
+            : 1.0
+    ),
     leader(NULL),
-    flexible_controller(NULL),
-    flexible_controller_change_index(-1),
     lfo(NULL),
     envelope(NULL),
     envelope_change_index(-1),
     envelope_stage(EnvelopeStage::NONE),
     envelope_end_scheduled(false),
+    envelope_canceled(false),
     should_round(round_to > 0.0),
     is_ratio_same_as_value(
-        std::fabs(min_value - 0.0) < 0.000001
+        log_scale_toggle == NULL
+        && std::fabs(min_value - 0.0) < 0.000001
         && std::fabs(max_value - 1.0) < 0.000001
     ),
     round_to(round_to),
@@ -299,27 +401,36 @@ FloatParam::FloatParam(
 }
 
 
-FloatParam::FloatParam(FloatParam& leader) noexcept
-    : Param<Number>(
-        leader.name, leader.min_value, leader.max_value, leader.default_value
+template<ParamEvaluation evaluation>
+FloatParam<evaluation>::FloatParam(FloatParam<evaluation>& leader) noexcept
+    : Param<Number, evaluation>(
+        leader.get_name(),
+        leader.get_min_value(),
+        leader.get_max_value(),
+        leader.get_default_value()
     ),
-    log_scale_toggle(leader.log_scale_toggle),
-    log_scale_table(leader.log_scale_table),
-    log_scale_inv_table(leader.log_scale_inv_table),
-    log_scale_table_max_index(leader.log_scale_table_max_index),
-    log_scale_table_scale(leader.log_scale_table_scale),
-    log_scale_inv_table_scale(leader.log_scale_inv_table_scale),
+    log_scale_toggle(leader.get_log_scale_toggle()),
+    log_scale_table(leader.get_log_scale_table()),
+    log_scale_table_max_index(leader.get_log_scale_table_max_index()),
+    log_scale_table_scale(leader.get_log_scale_table_scale()),
+    log_min_minus(log_scale_toggle != NULL ? -std::log2(leader.get_min_value()) : 0.0),
+    log_range_inv(
+        log_scale_toggle != NULL
+            ? 1.0 / (std::log2(leader.get_max_value()) + log_min_minus)
+            : 1.0
+    ),
     leader(&leader),
-    flexible_controller(NULL),
     lfo(NULL),
     envelope(NULL),
     envelope_change_index(-1),
     envelope_stage(EnvelopeStage::NONE),
     envelope_end_scheduled(false),
+    envelope_canceled(false),
     should_round(false),
     is_ratio_same_as_value(
-        std::fabs(min_value - 0.0) < 0.000001
-        && std::fabs(max_value - 1.0) < 0.000001
+        leader.get_log_scale_toggle() == NULL
+        && std::fabs(leader.get_min_value() - 0.0) < 0.000001
+        && std::fabs(leader.get_max_value() - 1.0) < 0.000001
     ),
     round_to(0.0),
     round_to_inv(0.0),
@@ -330,29 +441,32 @@ FloatParam::FloatParam(FloatParam& leader) noexcept
 }
 
 
-Number FloatParam::get_value() const noexcept
+template<ParamEvaluation evaluation>
+Number FloatParam<evaluation>::get_value() const noexcept
 {
     if (is_following_leader()) {
         return leader->get_value();
-    } else if (midi_controller != NULL) {
-        return round_value(ratio_to_value(midi_controller->get_value()));
-    } else if (flexible_controller != NULL) {
-        flexible_controller->update();
+    } else if (this->midi_controller != NULL) {
+        return round_value(ratio_to_value(this->midi_controller->get_value()));
+    } else if (this->macro != NULL) {
+        this->macro->update();
 
-        return round_value(ratio_to_value(flexible_controller->get_value()));
+        return round_value(ratio_to_value(this->macro->get_value()));
     } else {
-        return get_raw_value();
+        return this->get_raw_value();
     }
 }
 
 
-bool FloatParam::is_following_leader() const noexcept
+template<ParamEvaluation evaluation>
+bool FloatParam<evaluation>::is_following_leader() const noexcept
 {
-    return leader != NULL && leader->envelope == NULL;
+    return leader != NULL && leader->get_envelope() == NULL;
 }
 
 
-bool FloatParam::is_logarithmic() const noexcept
+template<ParamEvaluation evaluation>
+bool FloatParam<evaluation>::is_logarithmic() const noexcept
 {
     return (
         log_scale_toggle != NULL
@@ -361,15 +475,17 @@ bool FloatParam::is_logarithmic() const noexcept
 }
 
 
-void FloatParam::set_value(Number const new_value) noexcept
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::set_value(Number const new_value) noexcept
 {
     latest_event_type = EVT_SET_VALUE;
 
-    Param<Number>::set_value(round_value(new_value));
+    Param<Number, evaluation>::set_value(round_value(new_value));
 }
 
 
-Number FloatParam::round_value(Number const value) const noexcept
+template<ParamEvaluation evaluation>
+Number FloatParam<evaluation>::round_value(Number const value) const noexcept
 {
     if (should_round) {
         return std::round(value * round_to_inv) * round_to;
@@ -379,78 +495,124 @@ Number FloatParam::round_value(Number const value) const noexcept
 }
 
 
-void FloatParam::set_ratio(Number const ratio) noexcept
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::set_ratio(Number const ratio) noexcept
 {
     set_value(ratio_to_value(ratio));
 }
 
 
-Number FloatParam::get_ratio() const noexcept
+template<ParamEvaluation evaluation>
+Number FloatParam<evaluation>::get_ratio() const noexcept
 {
     if (is_following_leader()) {
         return leader->get_ratio();
-    } else if (flexible_controller != NULL) {
-        flexible_controller->update();
+    } else if (this->macro != NULL) {
+        this->macro->update();
 
-        return flexible_controller->get_value();
-    } else if (midi_controller != NULL) {
-        return midi_controller->get_value();
+        return this->macro->get_value();
+    } else if (this->midi_controller != NULL) {
+        return this->midi_controller->get_value();
     }
 
-    return std::min(1.0, std::max(0.0, value_to_ratio(get_raw_value())));
+    return std::min(1.0, std::max(0.0, value_to_ratio(this->get_raw_value())));
 }
 
 
-Number FloatParam::get_default_ratio() const noexcept
+template<ParamEvaluation evaluation>
+Number FloatParam<evaluation>::get_default_ratio() const noexcept
 {
-    return value_to_ratio(get_default_value());
+    return value_to_ratio(this->get_default_value());
 }
 
 
-Number FloatParam::ratio_to_value(Number const ratio) const noexcept
+template<ParamEvaluation evaluation>
+ToggleParam const* FloatParam<evaluation>::get_log_scale_toggle() const noexcept
+{
+    return log_scale_toggle;
+}
+
+
+template<ParamEvaluation evaluation>
+Number const* FloatParam<evaluation>::get_log_scale_table() const noexcept
+{
+    return log_scale_table;
+}
+
+
+template<ParamEvaluation evaluation>
+int FloatParam<evaluation>::get_log_scale_table_max_index() const noexcept
+{
+    return log_scale_table_max_index;
+}
+
+
+template<ParamEvaluation evaluation>
+Number FloatParam<evaluation>::get_log_scale_table_scale() const noexcept
+{
+    return log_scale_table_scale;
+}
+
+
+template<ParamEvaluation evaluation>
+Number FloatParam<evaluation>::ratio_to_value(Number const ratio) const noexcept
 {
     if (is_logarithmic()) {
-        return Math::lookup(
-            log_scale_table,
-            log_scale_table_max_index,
-            ratio * log_scale_table_scale
-        );
+        return ratio_to_value_log(ratio);
     }
 
-    return Param<Number>::ratio_to_value(ratio);
+    return ratio_to_value_raw(ratio);
 }
 
 
-Number FloatParam::value_to_ratio(Number const value) const noexcept
+template<ParamEvaluation evaluation>
+Number FloatParam<evaluation>::ratio_to_value_log(Number const ratio) const noexcept
+{
+    return Math::lookup(
+        log_scale_table,
+        log_scale_table_max_index,
+        ratio * log_scale_table_scale
+    );
+}
+
+
+template<ParamEvaluation evaluation>
+Number FloatParam<evaluation>::ratio_to_value_raw(Number const ratio) const noexcept
+{
+    return Param<Number, evaluation>::ratio_to_value(ratio);
+}
+
+
+template<ParamEvaluation evaluation>
+Number FloatParam<evaluation>::value_to_ratio(Number const value) const noexcept
 {
     if (is_logarithmic()) {
-        Number const min = this->min_value;
-        Number const max = this->max_value;
-        Number const log_range = std::log2(max) - std::log2(min);
-
-        return (std::log2(value) - std::log2(min)) / log_range;
+        return (std::log2(value) + log_min_minus) * log_range_inv;
     }
 
-    return Param<Number>::value_to_ratio(value);
+    return Param<Number, evaluation>::value_to_ratio(value);
 }
 
 
-Integer FloatParam::get_change_index() const noexcept
+template<ParamEvaluation evaluation>
+Integer FloatParam<evaluation>::get_change_index() const noexcept
 {
     if (is_following_leader()) {
         return leader->get_change_index();
-    } else if (flexible_controller != NULL) {
-        flexible_controller->update();
+    } else if (this->macro != NULL) {
+        this->macro->update();
 
-        return flexible_controller->get_change_index();
+        return this->macro->get_change_index();
     } else {
-        return Param<Number>::get_change_index();
+        return Param<Number, evaluation>::get_change_index();
     }
 }
 
 
-bool FloatParam::is_constant_in_next_round(
-        Integer const round, Integer const sample_count
+template<ParamEvaluation evaluation>
+bool FloatParam<evaluation>::is_constant_in_next_round(
+        Integer const round,
+        Integer const sample_count
 ) noexcept {
     if (round == constantness_round) {
         return constantness;
@@ -462,8 +624,10 @@ bool FloatParam::is_constant_in_next_round(
 }
 
 
-bool FloatParam::is_constant_until(Integer const sample_count) const noexcept
-{
+template<ParamEvaluation evaluation>
+bool FloatParam<evaluation>::is_constant_until(
+        Integer const sample_count
+) const noexcept {
     if (is_following_leader()) {
         return leader->is_constant_until(sample_count);
     }
@@ -474,7 +638,7 @@ bool FloatParam::is_constant_until(Integer const sample_count) const noexcept
 
     Integer const last_sample_idx = sample_count - 1;
 
-    if (latest_event_type == EVT_LINEAR_RAMP || has_upcoming_events(last_sample_idx)) {
+    if (latest_event_type == EVT_LINEAR_RAMP || this->has_upcoming_events(last_sample_idx)) {
         return false;
     }
 
@@ -486,39 +650,40 @@ bool FloatParam::is_constant_until(Integer const sample_count) const noexcept
         return envelope_change_index == envelope->get_change_index();
     }
 
-    if (midi_controller != NULL) {
+    if (this->midi_controller != NULL) {
         return (
-            midi_controller->events.is_empty()
+            this->midi_controller->events.is_empty()
             || !(
-                is_time_offset_before_sample_count(
-                    midi_controller->events.front().time_offset, last_sample_idx
+                this->is_time_offset_before_sample_count(
+                    this->midi_controller->events.front().time_offset, last_sample_idx
                 )
             )
         );
     }
 
-    if (flexible_controller != NULL) {
-        flexible_controller->update();
+    if (this->macro != NULL) {
+        this->macro->update();
 
-        return flexible_controller->get_change_index() == flexible_controller_change_index;
+        return this->macro->get_change_index() == this->macro_change_index;
     }
 
     return true;
 }
 
 
-void FloatParam::skip_round(
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::skip_round(
         Integer const round,
         Integer const sample_count
 ) noexcept {
     if (is_following_leader()) {
         leader->skip_round(round, sample_count);
-    } else if (cached_round != round && !events.is_empty()) {
-        current_time += (Seconds)sample_count * sampling_period;
-        cached_round = round;
+    } else if (this->cached_round != round && !this->events.is_empty()) {
+        this->current_time += (Seconds)sample_count * this->sampling_period;
+        this->cached_round = round;
 
         if (envelope_stage != EnvelopeStage::NONE) {
-            Seconds const offset = sample_count_to_relative_time_offset(sample_count);
+            Seconds const offset = this->sample_count_to_relative_time_offset(sample_count);
 
             envelope_position += offset;
 
@@ -530,41 +695,49 @@ void FloatParam::skip_round(
 }
 
 
-void FloatParam::schedule_value(
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::schedule_value(
         Seconds const time_offset,
         Number const new_value
 ) noexcept {
-    schedule(EVT_SET_VALUE, time_offset, 0, 0.0, new_value);
+    this->schedule(EVT_SET_VALUE, time_offset, 0, 0.0, new_value);
 }
 
 
-void FloatParam::schedule_linear_ramp(
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::schedule_linear_ramp(
         Seconds const duration,
         Number const target_value
 ) noexcept {
-    Seconds const last_event_time_offset = get_last_event_time_offset();
+    Seconds const last_event_time_offset = this->get_last_event_time_offset();
 
     if (is_logarithmic()) {
-        schedule(
+        this->schedule(
             EVT_LOG_RAMP, last_event_time_offset, 0, duration, target_value
         );
     } else {
-        schedule(
+        this->schedule(
             EVT_LINEAR_RAMP, last_event_time_offset, 0, duration, target_value
         );
     }
 
-    schedule(
+    this->schedule(
         EVT_SET_VALUE, last_event_time_offset + duration, 0, 0.0, target_value
     );
 }
 
 
-void FloatParam::handle_event(Event const& event) noexcept
-{
-    Param<Number>::handle_event(event);
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::handle_event(
+        SignalProducer::Event const& event
+) noexcept {
+    Param<Number, evaluation>::handle_event(event);
 
     switch (event.type) {
+        case SignalProducer::EVT_CANCEL:
+            handle_cancel_event(event);
+            break;
+
         case EVT_SET_VALUE:
             handle_set_value_event(event);
             break;
@@ -582,43 +755,50 @@ void FloatParam::handle_event(Event const& event) noexcept
             break;
 
         case EVT_ENVELOPE_END:
-            handle_envelope_end_event(event);
+            handle_envelope_end_event();
             break;
 
-        case EVT_CANCEL:
-            handle_cancel_event(event);
+        case EVT_ENVELOPE_CANCEL:
+            handle_envelope_cancel_event();
+            break;
+
+        default:
             break;
     }
 }
 
 
-void FloatParam::handle_set_value_event(Event const& event) noexcept
-{
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::handle_set_value_event(
+        SignalProducer::Event const& event
+) noexcept {
     set_value(event.number_param_2);
 }
 
 
-void FloatParam::handle_linear_ramp_event(Event const& event) noexcept
-{
-    Number const value = get_raw_value();
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::handle_linear_ramp_event(
+        SignalProducer::Event const& event
+) noexcept {
+    Number const value = this->get_raw_value();
     Number const done_samples = (
-        (Number)(current_time - event.time_offset) * (Number)sample_rate
+        (Number)(this->current_time - event.time_offset) * (Number)this->sample_rate
     );
     Seconds duration = (Seconds)event.number_param_1;
     Number target_value = event.number_param_2;
 
-    if (target_value < min_value) {
-        Number const min_diff = min_value - value;
+    if (target_value < this->min_value) {
+        Number const min_diff = this->min_value - value;
         Number const target_diff = target_value - value;
 
         duration *= (Seconds)(min_diff / target_diff);
-        target_value = min_value;
-    } else if (target_value > max_value) {
-        Number const max_diff = max_value - value;
+        target_value = this->min_value;
+    } else if (target_value > this->max_value) {
+        Number const max_diff = this->max_value - value;
         Number const target_diff = target_value - value;
 
         duration *= (Seconds)(max_diff / target_diff);
-        target_value = max_value;
+        target_value = this->max_value;
     }
 
     latest_event_type = EVT_LINEAR_RAMP;
@@ -627,18 +807,20 @@ void FloatParam::handle_linear_ramp_event(Event const& event) noexcept
         done_samples,
         value,
         target_value,
-        (Number)duration * (Number)sample_rate,
+        (Number)duration * (Number)this->sample_rate,
         duration,
         false
     );
 }
 
 
-void FloatParam::handle_log_ramp_event(Event const& event) noexcept
-{
-    Number const value = value_to_ratio(get_raw_value());
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::handle_log_ramp_event(
+        SignalProducer::Event const& event
+) noexcept {
+    Number const value = value_to_ratio(this->get_raw_value());
     Number const done_samples = (
-        (Number)(current_time - event.time_offset) * (Number)sample_rate
+        (Number)(this->current_time - event.time_offset) * (Number)this->sample_rate
     );
     Seconds duration = (Seconds)event.number_param_1;
     Number target_value = value_to_ratio(event.number_param_2);
@@ -663,37 +845,49 @@ void FloatParam::handle_log_ramp_event(Event const& event) noexcept
         done_samples,
         value,
         target_value,
-        (Number)duration * (Number)sample_rate,
+        (Number)duration * (Number)this->sample_rate,
         duration,
         true
     );
 }
 
 
-void FloatParam::handle_envelope_start_event(Event const& event) noexcept
-{
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::handle_envelope_start_event(
+        SignalProducer::Event const& event
+) noexcept {
     envelope_stage = EnvelopeStage::DAHDS;
-    envelope_position = current_time - event.time_offset;
+    envelope_position = this->current_time - event.time_offset;
 }
 
 
-void FloatParam::handle_envelope_end_event(Event const& event) noexcept
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::handle_envelope_end_event() noexcept
 {
     envelope_stage = EnvelopeStage::R;
 }
 
 
-void FloatParam::handle_cancel_event(Event const& event) noexcept
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::handle_envelope_cancel_event() noexcept
 {
+    envelope_stage = EnvelopeStage::R;
+}
+
+
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::handle_cancel_event(
+        SignalProducer::Event const& event
+) noexcept {
     if (latest_event_type == EVT_LINEAR_RAMP) {
         Number const stop_value = linear_ramp_state.get_value_at(
             event.time_offset - linear_ramp_state.start_time_offset
         );
 
         if (linear_ramp_state.is_logarithmic) {
-            store_new_value(ratio_to_value(stop_value));
+            this->store_new_value(ratio_to_value_log(stop_value));
         } else {
-            store_new_value(stop_value);
+            this->store_new_value(stop_value);
         }
     }
 
@@ -701,47 +895,23 @@ void FloatParam::handle_cancel_event(Event const& event) noexcept
 }
 
 
-void FloatParam::set_midi_controller(
-        MidiController const* midi_controller
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::set_midi_controller(
+        MidiController* midi_controller
 ) noexcept {
-    if (midi_controller == NULL) {
-        if (this->midi_controller != NULL) {
-            set_value(ratio_to_value(this->midi_controller->get_value()));
-        }
-    } else {
-        set_value(ratio_to_value(midi_controller->get_value()));
-    }
-
-    this->midi_controller = midi_controller;
+    Param<Number, evaluation>::template set_midi_controller< FloatParam<evaluation> >(*this, midi_controller);
 }
 
 
-void FloatParam::set_flexible_controller(
-        FlexibleController* flexible_controller
-) noexcept {
-    if (flexible_controller == NULL) {
-        if (this->flexible_controller != NULL) {
-            this->flexible_controller->update();
-
-            set_value(ratio_to_value(this->flexible_controller->get_value()));
-        }
-    } else {
-        flexible_controller->update();
-        set_value(ratio_to_value(flexible_controller->get_value()));
-        flexible_controller_change_index = flexible_controller->get_change_index();
-    }
-
-    this->flexible_controller = flexible_controller;
-}
-
-
-FlexibleController const* FloatParam::get_flexible_controller() const noexcept
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::set_macro(Macro* macro) noexcept
 {
-    return flexible_controller;
+    Param<Number, evaluation>::template set_macro< FloatParam<evaluation> >(*this, macro);
 }
 
 
-void FloatParam::set_envelope(Envelope* const envelope) noexcept
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::set_envelope(Envelope* const envelope) noexcept
 {
     this->envelope = envelope;
 
@@ -752,22 +922,25 @@ void FloatParam::set_envelope(Envelope* const envelope) noexcept
 
     envelope_stage = EnvelopeStage::NONE;
     envelope_end_scheduled = false;
+    envelope_canceled = false;
     envelope_position = 0.0;
     envelope_end_time_offset = 0.0;
 }
 
 
-Envelope* FloatParam::get_envelope() const noexcept
+template<ParamEvaluation evaluation>
+Envelope* FloatParam<evaluation>::get_envelope() const noexcept
 {
-    return leader == NULL ? envelope : leader->envelope;
+    return leader == NULL ? envelope : leader->get_envelope();
 }
 
 
-void FloatParam::start_envelope(Seconds const time_offset) noexcept
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::start_envelope(Seconds const time_offset) noexcept
 {
     Seconds next_event_time_offset;
     Number next_value;
-    Envelope const* const envelope = get_envelope();
+    Envelope* const envelope = get_envelope();
 
     if (envelope == NULL) {
         return;
@@ -775,14 +948,20 @@ void FloatParam::start_envelope(Seconds const time_offset) noexcept
 
     envelope_stage = EnvelopeStage::NONE;
     envelope_end_scheduled = false;
+    envelope_canceled = false;
     envelope_position = 0.0;
     envelope_end_time_offset = 0.0;
 
-    // initial-v ==delay-t==> initial-v ==attack-t==> peak-v ==hold-t==> peak-v ==decay-t==> sustain-v
+    envelope->update();
+    envelope_change_index = envelope->get_change_index();
 
-    cancel_events(time_offset);
+    /*
+    initial-v ==delay-t==> initial-v ==attack-t==> peak-v ==hold-t==> peak-v ==decay-t==> sustain-v
+    */
 
-    schedule(EVT_ENVELOPE_START, time_offset);
+    this->cancel_events_after(time_offset);
+
+    this->schedule(EVT_ENVELOPE_START, time_offset);
 
     Number const amount = envelope->amount.get_value();
     next_value = ratio_to_value(amount * envelope->initial_value.get_value());
@@ -805,69 +984,128 @@ void FloatParam::start_envelope(Seconds const time_offset) noexcept
         ratio_to_value(amount * envelope->sustain_value.get_value())
     );
 
+    envelope_final_value = amount * envelope->final_value.get_value();
     envelope_release_time = (Seconds)envelope->release_time.get_value();
 }
 
 
-Seconds FloatParam::end_envelope(Seconds const time_offset) noexcept
+template<ParamEvaluation evaluation>
+Seconds FloatParam<evaluation>::end_envelope(Seconds const time_offset) noexcept
 {
-    Envelope const* const envelope = get_envelope();
+    if (envelope_canceled) {
+        return envelope_cancel_duration;
+    }
+
+    return end_envelope<EVT_ENVELOPE_END>(time_offset);
+}
+
+
+template<ParamEvaluation evaluation>
+template<SignalProducer::Event::Type event>
+Seconds FloatParam<evaluation>::end_envelope(
+        Seconds const time_offset,
+        Seconds const duration
+) noexcept {
+    Envelope* const envelope = get_envelope();
 
     if (envelope == NULL) {
         return 0.0;
     }
 
     if (envelope->dynamic.get_value() == ToggleParam::ON) {
+        envelope->update();
+        envelope_change_index = envelope->get_change_index();
+
+        envelope_final_value = (
+            envelope->amount.get_value() * envelope->final_value.get_value()
+        );
+
         envelope_release_time = (Seconds)envelope->release_time.get_value();
+    }
+
+    if (event == EVT_ENVELOPE_CANCEL) {
+        envelope_release_time = duration;
     }
 
     envelope_end_scheduled = true;
     envelope_end_time_offset = time_offset;
 
-    // current-v ==release-t==> release-v
+    /* current-v ==release-t==> release-v */
 
-    cancel_events(time_offset);
-    schedule(EVT_ENVELOPE_END, time_offset);
-    schedule_linear_ramp(
-        envelope_release_time,
-        ratio_to_value(
-            envelope->amount.get_value() * envelope->final_value.get_value()
-        )
-    );
+    this->cancel_events_after(time_offset);
+    this->schedule(event, time_offset);
+    schedule_linear_ramp(envelope_release_time, ratio_to_value(envelope_final_value));
 
     return envelope_release_time;
 }
 
 
-void FloatParam::set_lfo(LFO* lfo) noexcept
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::cancel_envelope(
+        Seconds const time_offset,
+        Seconds const duration
+) noexcept {
+    envelope_canceled = true;
+    envelope_cancel_duration = duration;
+    end_envelope<EVT_ENVELOPE_CANCEL>(time_offset, duration);
+}
+
+
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::update_envelope(Seconds const time_offset) noexcept
+{
+    Envelope* envelope = get_envelope();
+
+    if (envelope != NULL) {
+        envelope->update();
+        process_envelope(*envelope, time_offset);
+
+        if (envelope_end_scheduled) {
+            return;
+        }
+
+        envelope_final_value = envelope->amount.get_value() * envelope->final_value.get_value();
+        envelope_release_time = (Seconds)envelope->release_time.get_value();
+    }
+}
+
+
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::set_lfo(LFO* lfo) noexcept
 {
     this->lfo = lfo;
 }
 
 
-LFO const* FloatParam::get_lfo() const noexcept
+template<ParamEvaluation evaluation>
+LFO const* FloatParam<evaluation>::get_lfo() const noexcept
 {
     return lfo;
 }
 
 
-Sample const* const* FloatParam::initialize_rendering(
+template<ParamEvaluation evaluation>
+Sample const* const* FloatParam<evaluation>::initialize_rendering(
         Integer const round,
         Integer const sample_count
 ) noexcept {
-    Param<Number>::initialize_rendering(round, sample_count);
+    Param<Number, evaluation>::initialize_rendering(round, sample_count);
 
     if (lfo != NULL) {
         return process_lfo(round, sample_count);
-    } else if (midi_controller != NULL) {
-        return process_midi_controller_events();
-    } else if (flexible_controller != NULL) {
-        return process_flexible_controller(sample_count);
+    } else if (this->midi_controller != NULL) {
+        if (is_logarithmic()) {
+            return process_midi_controller_events<true>();
+        } else {
+            return process_midi_controller_events<false>();
+        }
+    } else if (this->macro != NULL) {
+        return process_macro(sample_count);
     } else {
-        Envelope* const envelope = get_envelope();
+        Envelope* envelope = get_envelope();
 
-        if (envelope != NULL) {
-            return process_envelope(envelope);
+        if (envelope != NULL && envelope->dynamic.get_value() == ToggleParam::ON) {
+            process_envelope(*envelope);
         }
     }
 
@@ -875,7 +1113,8 @@ Sample const* const* FloatParam::initialize_rendering(
 }
 
 
-Sample const* const* FloatParam::process_lfo(
+template<ParamEvaluation evaluation>
+Sample const* const* FloatParam<evaluation>::process_lfo(
         Integer const round,
         Integer const sample_count
 ) noexcept {
@@ -883,7 +1122,7 @@ Sample const* const* FloatParam::process_lfo(
 
     if (is_ratio_same_as_value) {
         if (sample_count > 0) {
-            store_new_value(lfo_buffer[0][sample_count - 1]);
+            this->store_new_value(lfo_buffer[0][sample_count - 1]);
         }
 
         return lfo_buffer;
@@ -893,42 +1132,48 @@ Sample const* const* FloatParam::process_lfo(
 }
 
 
-Sample const* const* FloatParam::process_midi_controller_events() noexcept
+template<ParamEvaluation evaluation>
+template<bool is_logarithmic_>
+Sample const* const* FloatParam<evaluation>::process_midi_controller_events() noexcept
 {
-    Queue<Event>::SizeType const number_of_ctl_events = (
-        midi_controller->events.length()
+    Queue<SignalProducer::Event>::SizeType const number_of_ctl_events = (
+        this->midi_controller->events.length()
     );
 
     if (number_of_ctl_events == 0) {
         return NULL;
     }
 
-    cancel_events(0.0);
+    this->cancel_events_at(0.0);
 
     if (should_round) {
-        for (Queue<Event>::SizeType i = 0; i != number_of_ctl_events; ++i) {
-            Seconds const time_offset = midi_controller->events[i].time_offset;
-            Number const controller_value = midi_controller->events[i].number_param_1;
+        for (Queue<SignalProducer::SignalProducer::Event>::SizeType i = 0; i != number_of_ctl_events; ++i) {
+            Seconds const time_offset = this->midi_controller->events[i].time_offset;
+            Number const controller_value = this->midi_controller->events[i].number_param_1;
 
-            schedule_value(time_offset, ratio_to_value(controller_value));
+            if constexpr (is_logarithmic_) {
+                schedule_value(time_offset, ratio_to_value_log(controller_value));
+            } else {
+                schedule_value(time_offset, ratio_to_value_raw(controller_value));
+            }
         }
 
         return NULL;
     }
 
-    Queue<Event>::SizeType const last_ctl_event_index = number_of_ctl_events - 1;
+    Queue<SignalProducer::SignalProducer::Event>::SizeType const last_ctl_event_index = number_of_ctl_events - 1;
 
     Seconds previous_time_offset = 0.0;
-    Number previous_ratio = value_to_ratio(get_raw_value());
+    Number previous_ratio = value_to_ratio(this->get_raw_value());
 
-    for (Queue<Event>::SizeType i = 0; i != number_of_ctl_events; ++i) {
-        Seconds time_offset = midi_controller->events[i].time_offset;
+    for (Queue<SignalProducer::SignalProducer::Event>::SizeType i = 0; i != number_of_ctl_events; ++i) {
+        Seconds time_offset = this->midi_controller->events[i].time_offset;
 
         while (i != last_ctl_event_index) {
             ++i;
 
             Seconds const delta = std::fabs(
-                midi_controller->events[i].time_offset - time_offset
+                this->midi_controller->events[i].time_offset - time_offset
             );
 
             if (delta >= MIDI_CTL_SMALL_CHANGE_DURATION) {
@@ -937,16 +1182,22 @@ Sample const* const* FloatParam::process_midi_controller_events() noexcept
             }
         }
 
-        time_offset = midi_controller->events[i].time_offset;
+        time_offset = this->midi_controller->events[i].time_offset;
 
-        Number const controller_value = midi_controller->events[i].number_param_1;
+        Number const controller_value = this->midi_controller->events[i].number_param_1;
         Seconds const duration = smooth_change_duration(
             previous_ratio,
             controller_value,
             time_offset - previous_time_offset
         );
         previous_ratio = controller_value;
-        schedule_linear_ramp(duration, ratio_to_value(controller_value));
+
+        if constexpr (is_logarithmic_) {
+            schedule_linear_ramp(duration, ratio_to_value_log(controller_value));
+        } else {
+            schedule_linear_ramp(duration, ratio_to_value_raw(controller_value));
+        }
+
         previous_time_offset = time_offset;
     }
 
@@ -954,39 +1205,41 @@ Sample const* const* FloatParam::process_midi_controller_events() noexcept
 }
 
 
-Sample const* const* FloatParam::process_flexible_controller(
+template<ParamEvaluation evaluation>
+Sample const* const* FloatParam<evaluation>::process_macro(
         Integer const sample_count
 ) noexcept {
-    flexible_controller->update();
+    this->macro->update();
 
-    Integer const new_change_index = flexible_controller->get_change_index();
+    Integer const new_change_index = this->macro->get_change_index();
 
-    if (new_change_index == flexible_controller_change_index) {
+    if (new_change_index == this->macro_change_index) {
         return NULL;
     }
 
-    flexible_controller_change_index = new_change_index;
+    this->macro_change_index = new_change_index;
 
-    cancel_events(0.0);
+    this->cancel_events_at(0.0);
 
-    Number const controller_value = flexible_controller->get_value();
+    Number const macro_value = this->macro->get_value();
 
     if (should_round) {
-        set_value(ratio_to_value(controller_value));
+        set_value(ratio_to_value(macro_value));
     } else {
         Seconds const duration = smooth_change_duration(
-            value_to_ratio(get_raw_value()),
-            controller_value,
-            (Seconds)std::max((Integer)0, sample_count - 1) * sampling_period
+            value_to_ratio(this->get_raw_value()),
+            macro_value,
+            (Seconds)std::max((Integer)0, sample_count - 1) * this->sampling_period
         );
-        schedule_linear_ramp(duration, ratio_to_value(controller_value));
+        schedule_linear_ramp(duration, ratio_to_value(macro_value));
     }
 
     return NULL;
 }
 
 
-Seconds FloatParam::smooth_change_duration(
+template<ParamEvaluation evaluation>
+Seconds FloatParam<evaluation>::smooth_change_duration(
         Number const previous_value,
         Number const controller_value,
         Seconds const duration
@@ -1008,34 +1261,31 @@ Seconds FloatParam::smooth_change_duration(
 }
 
 
-
-Sample const* const* FloatParam::process_envelope(
-        Envelope* const envelope
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::process_envelope(
+        Envelope& envelope,
+        Seconds const time_offset
 ) noexcept {
     if (envelope_stage == EnvelopeStage::NONE) {
-        return NULL;
+        return;
     }
 
-    if (envelope->dynamic.get_value() != ToggleParam::ON) {
-        return NULL;
-    }
-
-    Integer const new_change_index = envelope->get_change_index();
+    Integer const new_change_index = envelope.get_change_index();
     bool const has_changed = new_change_index != envelope_change_index;
 
     envelope_change_index = new_change_index;
 
-    Number const amount = envelope->amount.get_value();
+    Number const amount = envelope.amount.get_value();
 
     if (envelope_stage == EnvelopeStage::DAHDS) {
-        cancel_events(0.0);
+        this->cancel_events_at(time_offset);
 
-        if (envelope_position > envelope->get_dahd_length()) {
+        if (envelope_position > envelope.get_dahd_length()) {
             Number const sustain_value = ratio_to_value(
-                amount * envelope->sustain_value.get_value()
+                amount * envelope.sustain_value.get_value()
             );
 
-            if (std::fabs(get_raw_value() - sustain_value) > 0.000001) {
+            if (std::fabs(this->get_raw_value() - sustain_value) > 0.000001) {
                 schedule_linear_ramp(0.1, sustain_value);
             }
         } else {
@@ -1043,56 +1293,59 @@ Sample const* const* FloatParam::process_envelope(
 
             next_event_time_offset = schedule_envelope_value_if_not_reached(
                 next_event_time_offset,
-                envelope->delay_time,
-                envelope->initial_value,
+                envelope.delay_time,
+                envelope.initial_value,
                 amount
             );
             next_event_time_offset = schedule_envelope_value_if_not_reached(
                 next_event_time_offset,
-                envelope->attack_time,
-                envelope->peak_value,
+                envelope.attack_time,
+                envelope.peak_value,
                 amount
             );
             next_event_time_offset = schedule_envelope_value_if_not_reached(
                 next_event_time_offset,
-                envelope->hold_time,
-                envelope->peak_value,
+                envelope.hold_time,
+                envelope.peak_value,
                 amount
             );
             next_event_time_offset = schedule_envelope_value_if_not_reached(
                 next_event_time_offset,
-                envelope->decay_time,
-                envelope->sustain_value,
+                envelope.decay_time,
+                envelope.sustain_value,
                 amount
             );
         }
     }
 
-    if (envelope_end_scheduled && (has_changed || envelope_stage == EnvelopeStage::DAHDS)) {
+    if (
+            envelope_end_scheduled
+            && !envelope_canceled
+            && (has_changed || envelope_stage == EnvelopeStage::DAHDS)
+    ) {
         if (envelope_end_time_offset < 0.0) {
             envelope_end_time_offset = 0.0;
         }
 
         envelope_release_time = std::min(
-            envelope_release_time, (Seconds)envelope->release_time.get_value()
+            envelope_release_time, (Seconds)envelope.release_time.get_value()
         );
 
-        cancel_events(envelope_end_time_offset);
-        schedule(EVT_ENVELOPE_END, envelope_end_time_offset);
+        this->cancel_events_at(envelope_end_time_offset);
+        this->schedule(EVT_ENVELOPE_END, envelope_end_time_offset);
         schedule_linear_ramp(
             envelope_release_time,
-            ratio_to_value(amount * envelope->final_value.get_value())
+            ratio_to_value(amount * envelope.final_value.get_value())
         );
     }
-
-    return NULL;
 }
 
 
-Seconds FloatParam::schedule_envelope_value_if_not_reached(
+template<ParamEvaluation evaluation>
+Seconds FloatParam<evaluation>::schedule_envelope_value_if_not_reached(
         Seconds const next_event_time_offset,
-        FloatParam const& time_param,
-        FloatParam const& value_param,
+        FloatParamB const& time_param,
+        FloatParamB const& value_param,
         Number const amount
 ) noexcept {
     Seconds const duration = next_event_time_offset + time_param.get_value();
@@ -1109,59 +1362,104 @@ Seconds FloatParam::schedule_envelope_value_if_not_reached(
 }
 
 
-void FloatParam::render(
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::render(
         Integer const round,
         Integer const first_sample_index,
         Integer const last_sample_index,
         Sample** buffer
 ) noexcept {
-    if (lfo != NULL) {
-        Sample sample;
-
-        for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-            buffer[0][i] = sample = (Sample)ratio_to_value(lfo_buffer[0][i]);
-        }
-
-        if (last_sample_index != first_sample_index) {
-            store_new_value((Number)sample);
-        }
-    } else if (latest_event_type == EVT_LINEAR_RAMP) {
-        Sample sample;
-
-        if (linear_ramp_state.is_logarithmic) {
-            for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-                buffer[0][i] = sample = (
-                    (Sample)ratio_to_value(linear_ramp_state.get_next_value())
-                );
-            }
+    if constexpr (evaluation == ParamEvaluation::SAMPLE) {
+        if (lfo != NULL) {
+            render_with_lfo(round, first_sample_index, last_sample_index, buffer);
+        } else if (latest_event_type == EVT_LINEAR_RAMP) {
+            render_linear_ramp(round, first_sample_index, last_sample_index, buffer);
         } else {
-            for (Integer i = first_sample_index; i != last_sample_index; ++i) {
-                buffer[0][i] = sample = (Sample)linear_ramp_state.get_next_value();
-            }
+            Param<Number, evaluation>::render(
+                round, first_sample_index, last_sample_index, buffer
+            );
         }
 
-        if (last_sample_index != first_sample_index) {
-            store_new_value((Number)sample);
-        }
-    } else {
-        Param<Number>::render(round, first_sample_index, last_sample_index, buffer);
-    }
-
-    if (envelope_stage != EnvelopeStage::NONE) {
-        Seconds const time_delta = sample_count_to_relative_time_offset(
-            last_sample_index - first_sample_index
-        );
-
-        envelope_position += time_delta;
-
-        if (envelope_end_scheduled) {
-            envelope_end_time_offset -= time_delta;
-        }
+        advance_envelope(first_sample_index, last_sample_index);
     }
 }
 
 
-FloatParam::LinearRampState::LinearRampState() noexcept
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::render_with_lfo(
+        Integer const round,
+        Integer const first_sample_index,
+        Integer const last_sample_index,
+        Sample** buffer
+) noexcept {
+    Sample sample;
+
+    if (is_logarithmic()) {
+        for (Integer i = first_sample_index; i != last_sample_index; ++i) {
+            buffer[0][i] = sample = (Sample)ratio_to_value_log(lfo_buffer[0][i]);
+        }
+    } else {
+        for (Integer i = first_sample_index; i != last_sample_index; ++i) {
+            buffer[0][i] = sample = (Sample)ratio_to_value_raw(lfo_buffer[0][i]);
+        }
+    }
+
+    if (last_sample_index != first_sample_index) {
+        this->store_new_value((Number)sample);
+    }
+}
+
+
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::render_linear_ramp(
+        Integer const round,
+        Integer const first_sample_index,
+        Integer const last_sample_index,
+        Sample** buffer
+) noexcept {
+    Sample sample;
+
+    if (linear_ramp_state.is_logarithmic) {
+        for (Integer i = first_sample_index; i != last_sample_index; ++i) {
+            buffer[0][i] = sample = (
+                (Sample)ratio_to_value_log(linear_ramp_state.advance())
+            );
+        }
+    } else {
+        for (Integer i = first_sample_index; i != last_sample_index; ++i) {
+            buffer[0][i] = sample = (Sample)linear_ramp_state.advance();
+        }
+    }
+
+    if (last_sample_index != first_sample_index) {
+        this->store_new_value((Number)sample);
+    }
+}
+
+
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::advance_envelope(
+        Integer const first_sample_index,
+        Integer const last_sample_index
+) noexcept {
+    if (envelope_stage == EnvelopeStage::NONE) {
+        return;
+    }
+
+    Seconds const time_delta = this->sample_count_to_relative_time_offset(
+        last_sample_index - first_sample_index
+    );
+
+    envelope_position += time_delta;
+
+    if (envelope_end_scheduled) {
+        envelope_end_time_offset -= time_delta;
+    }
+}
+
+
+template<ParamEvaluation evaluation>
+FloatParam<evaluation>::LinearRampState::LinearRampState() noexcept
     : start_time_offset(0.0),
     done_samples(0.0),
     initial_value(0.0),
@@ -1176,7 +1474,8 @@ FloatParam::LinearRampState::LinearRampState() noexcept
 }
 
 
-void FloatParam::LinearRampState::init(
+template<ParamEvaluation evaluation>
+void FloatParam<evaluation>::LinearRampState::init(
         Seconds const start_time_offset,
         Number const done_samples,
         Number const initial_value,
@@ -1185,28 +1484,29 @@ void FloatParam::LinearRampState::init(
         Seconds const duration,
         bool const is_logarithmic
 ) noexcept {
-    LinearRampState::is_logarithmic = is_logarithmic;
+    this->is_logarithmic = is_logarithmic;
 
     if (duration_in_samples > 0.0) {
         is_done = false;
 
-        LinearRampState::start_time_offset = start_time_offset;
-        LinearRampState::done_samples = done_samples;
-        LinearRampState::initial_value = initial_value;
-        LinearRampState::target_value = target_value;
-        LinearRampState::duration_in_samples = duration_in_samples;
-        LinearRampState::duration = duration;
+        this->start_time_offset = start_time_offset;
+        this->done_samples = done_samples;
+        this->initial_value = initial_value;
+        this->target_value = target_value;
+        this->duration_in_samples = duration_in_samples;
+        this->duration = duration;
 
         delta = target_value - initial_value;
         speed = 1.0 / duration_in_samples;
     } else {
         is_done = true;
-        LinearRampState::target_value = target_value;
+        this->target_value = target_value;
     }
 }
 
 
-Number FloatParam::LinearRampState::get_next_value() noexcept
+template<ParamEvaluation evaluation>
+Number FloatParam<evaluation>::LinearRampState::advance() noexcept
 {
     if (is_done) {
         return target_value;
@@ -1224,7 +1524,8 @@ Number FloatParam::LinearRampState::get_next_value() noexcept
 }
 
 
-Number FloatParam::LinearRampState::get_value_at(
+template<ParamEvaluation evaluation>
+Number FloatParam<evaluation>::LinearRampState::get_value_at(
         Seconds const time_offset
 ) const noexcept {
     if (duration > 0.0 && time_offset <= duration) {
@@ -1237,14 +1538,14 @@ Number FloatParam::LinearRampState::get_value_at(
 
 template<class ModulatorSignalProducerClass>
 ModulatableFloatParam<ModulatorSignalProducerClass>::ModulatableFloatParam(
-        ModulatorSignalProducerClass* modulator,
-        FloatParam& modulation_level_leader,
+        ModulatorSignalProducerClass* const modulator,
+        FloatParamS& modulation_level_leader,
         std::string const name,
         Number const min_value,
         Number const max_value,
         Number const default_value
 ) noexcept
-    : FloatParam(name, min_value, max_value, default_value),
+    : FloatParamS(name, min_value, max_value, default_value),
     modulation_level(modulation_level_leader),
     modulator(modulator)
 {
@@ -1254,9 +1555,9 @@ ModulatableFloatParam<ModulatorSignalProducerClass>::ModulatableFloatParam(
 
 template<class ModulatorSignalProducerClass>
 ModulatableFloatParam<ModulatorSignalProducerClass>::ModulatableFloatParam(
-        FloatParam& leader
+        FloatParamS& leader
 ) noexcept
-    : FloatParam(leader),
+    : FloatParamS(leader),
     modulation_level("", 0.0, 0.0, 0.0),
     modulator(NULL)
 {
@@ -1266,15 +1567,16 @@ ModulatableFloatParam<ModulatorSignalProducerClass>::ModulatableFloatParam(
 
 template<class ModulatorSignalProducerClass>
 bool ModulatableFloatParam<ModulatorSignalProducerClass>::is_constant_in_next_round(
-        Integer const round, Integer const sample_count
+        Integer const round,
+        Integer const sample_count
 ) noexcept {
     if (modulator == NULL) {
-        return FloatParam::is_constant_in_next_round(round, sample_count);
+        return FloatParamS::is_constant_in_next_round(round, sample_count);
     }
 
     return (
         modulation_level.is_constant_in_next_round(round, sample_count)
-        && FloatParam::is_constant_in_next_round(round, sample_count)
+        && FloatParamS::is_constant_in_next_round(round, sample_count)
         && modulation_level.get_value() <= MODULATION_LEVEL_INSIGNIFICANT
     );
 }
@@ -1285,7 +1587,7 @@ Sample const* const* ModulatableFloatParam<ModulatorSignalProducerClass>::initia
         Integer const round,
         Integer const sample_count
 ) noexcept {
-    Sample const* const* const buffer = FloatParam::initialize_rendering(
+    Sample const* const* const buffer = FloatParamS::initialize_rendering(
         round, sample_count
     );
 
@@ -1295,7 +1597,7 @@ Sample const* const* ModulatableFloatParam<ModulatorSignalProducerClass>::initia
         return buffer;
     }
 
-    modulation_level_buffer = FloatParam::produce_if_not_constant(
+    modulation_level_buffer = FloatParamS::produce_if_not_constant(
         modulation_level, round, sample_count
     );
 
@@ -1329,7 +1631,7 @@ void ModulatableFloatParam<ModulatorSignalProducerClass>::render(
         Integer const last_sample_index,
         Sample** buffer
 ) noexcept {
-    FloatParam::render(round, first_sample_index, last_sample_index, buffer);
+    FloatParamS::render(round, first_sample_index, last_sample_index, buffer);
 
     if (is_no_op) {
         return;
@@ -1356,7 +1658,7 @@ template<class ModulatorSignalProducerClass>
 void ModulatableFloatParam<ModulatorSignalProducerClass>::start_envelope(
         Seconds const time_offset
 ) noexcept {
-    FloatParam::start_envelope(time_offset);
+    FloatParamS::start_envelope(time_offset);
 
     if (modulator != NULL) {
         modulation_level.start_envelope(time_offset);
@@ -1368,7 +1670,7 @@ template<class ModulatorSignalProducerClass>
 Seconds ModulatableFloatParam<ModulatorSignalProducerClass>::end_envelope(
         Seconds const time_offset
 ) noexcept {
-    Seconds const envelope_end = FloatParam::end_envelope(time_offset);
+    Seconds const envelope_end = FloatParamS::end_envelope(time_offset);
 
     if (modulator == NULL) {
         return envelope_end;
@@ -1383,11 +1685,36 @@ Seconds ModulatableFloatParam<ModulatorSignalProducerClass>::end_envelope(
 
 
 template<class ModulatorSignalProducerClass>
+void ModulatableFloatParam<ModulatorSignalProducerClass>::cancel_envelope(
+        Seconds const time_offset,
+        Seconds const duration
+) noexcept {
+    FloatParamS::cancel_envelope(time_offset, duration);
+
+    if (modulator != NULL) {
+        modulation_level.cancel_envelope(time_offset, duration);
+    }
+}
+
+
+template<class ModulatorSignalProducerClass>
+void ModulatableFloatParam<ModulatorSignalProducerClass>::update_envelope(
+        Seconds const time_offset
+) noexcept {
+    FloatParamS::update_envelope(time_offset);
+
+    if (modulator != NULL) {
+        modulation_level.update_envelope(time_offset);
+    }
+}
+
+
+template<class ModulatorSignalProducerClass>
 void ModulatableFloatParam<ModulatorSignalProducerClass>::skip_round(
         Integer const round,
         Integer const sample_count
 ) noexcept {
-    FloatParam::skip_round(round, sample_count);
+    FloatParamS::skip_round(round, sample_count);
 
     if (modulator != NULL) {
         modulation_level.skip_round(round, sample_count);

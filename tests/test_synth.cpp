@@ -54,6 +54,13 @@ constexpr Synth::MessageType ASSIGN_CONTROLLER = Synth::MessageType::ASSIGN_CONT
 constexpr Synth::MessageType CLEAR = Synth::MessageType::CLEAR;
 
 
+constexpr Integer PEAK_CTL_TEST_BLOCK_SIZE = 8192;
+constexpr Number PEAK_CTL_TEST_OSC_1_VOL = 0.9;
+constexpr Number PEAK_CTL_TEST_OSC_2_VOL = 0.6;
+constexpr Number PEAK_CTL_TEST_FILTER_1_GAIN = -6.0;
+constexpr Number PEAK_CTL_TEST_REVERB_DRY = 0.1;
+
+
 TEST(communication_with_the_gui_is_lock_free, {
     Synth synth;
 
@@ -242,8 +249,8 @@ TEST(can_look_up_param_id_by_name, {
         max_collisions, avg_collisions, avg_bucket_size
     );
 
-    assert_lte((int)max_collisions, 6);
-    assert_lte(avg_bucket_size, 3.0);
+    assert_lte((int)max_collisions, 7);
+    assert_lte(avg_bucket_size, 3.07);
     assert_lte(avg_collisions, 3.5);
 
     assert_eq(Synth::ParamId::MAX_PARAM_ID, synth.get_param_id(""));
@@ -333,12 +340,7 @@ TEST(all_sound_off_message_turns_off_all_sounds_immediately, {
     constexpr Frequency sample_rate = 22050.0;
 
     Synth synth;
-    SumOfSines expected(
-        0.0, 0.0,
-        0.0, 0.0,
-        0.0, 0.0,
-        synth.get_channels()
-    );
+    Constant expected(0.0, synth.get_channels());
     Sample const* const* rendered_samples;
     Sample const* const* expected_samples;
 
@@ -353,7 +355,7 @@ TEST(all_sound_off_message_turns_off_all_sounds_immediately, {
     synth.note_on(0.0, 0, Midi::NOTE_A_5, 127);
     synth.all_sound_off(1.0 / sample_rate, 1);
 
-    expected_samples = SignalProducer::produce<SumOfSines>(expected, 1);
+    expected_samples = SignalProducer::produce<Constant>(expected, 1);
     rendered_samples = SignalProducer::produce<Synth>(synth, 1);
 
     assert_eq(expected_samples[0], rendered_samples[0], block_size, DOUBLE_DELTA);
@@ -746,11 +748,11 @@ TEST(garbage_collector_does_not_deallocate_newly_triggered_note_instead_of_decay
     set_param(synth, Synth::ParamId::N1DEC, 0.03);
     synth.process_messages();
 
-    synth.note_off(0.0, 1, Midi::NOTE_A_3, 100); /* note off is delayed due to sustain pedal */
+    synth.note_off(0.0, 1, Midi::NOTE_A_3, 100); /* note off is deferred due to sustain pedal */
     synth.note_on(0.001, 1, Midi::NOTE_A_3, 100); /* second voice assigned to the same note */
     SignalProducer::produce<Synth>(synth, 2); /* first voice gets garbage collected */
 
-    synth.note_off(0.0, 1, Midi::NOTE_A_3, 100); /* also delayed */
+    synth.note_off(0.0, 1, Midi::NOTE_A_3, 100); /* also deferred */
     synth.control_change(0.0, 1, Midi::SUSTAIN_PEDAL, 0); /* second voice should be released */
 
     rendered_samples = SignalProducer::produce<Synth>(synth, 3);
@@ -765,7 +767,7 @@ TEST(garbage_collector_does_not_deallocate_newly_triggered_note_instead_of_decay
 })
 
 
-TEST(garbage_collected_voices_are_not_released_again_when_sustain_pedal_is_lifted, {
+TEST(garbage_collected_and_deferred_stopped_reallocated_notes_are_not_released_again_when_sustain_pedal_is_lifted, {
     constexpr Integer block_size = 2048;
     constexpr Frequency sample_rate = 22050.0;
 
@@ -796,7 +798,7 @@ TEST(garbage_collected_voices_are_not_released_again_when_sustain_pedal_is_lifte
     synth.note_on(0.000001, 1, Midi::NOTE_A_3, 127);
     SignalProducer::produce<Synth>(synth, 1); /* note starts then decays */
 
-    synth.note_off(0.0, 1, Midi::NOTE_A_3, 127); /* note off is delayed due to sustain pedal */
+    synth.note_off(0.0, 1, Midi::NOTE_A_3, 127); /* note off is deferred due to sustain pedal */
     SignalProducer::produce<Synth>(synth, 2); /* voice gets garbage collected */
 
     set_param(synth, Synth::ParamId::N1HLD, 1.0);
@@ -810,4 +812,255 @@ TEST(garbage_collected_voices_are_not_released_again_when_sustain_pedal_is_lifte
 
     assert_eq(expected_samples[0], rendered_samples[0], block_size, 0.001);
     assert_eq(expected_samples[1], rendered_samples[1], block_size, 0.001);
+})
+
+
+TEST(note_off_stops_notes_that_are_triggered_multiple_times_during_sustaining, {
+    constexpr Frequency sample_rate = 3000.0;
+    constexpr Integer block_size = 3000;
+    Synth synth;
+    Constant expected(0.0, synth.get_channels());
+    Sample const* const* rendered_samples;
+    Sample const* const* expected_samples;
+
+    synth.set_sample_rate(sample_rate);
+    synth.set_block_size(block_size);
+
+    expected.set_sample_rate(sample_rate);
+    expected.set_block_size(block_size);
+
+    synth.resume();
+
+    synth.control_change(0.01, 1, Midi::SUSTAIN_PEDAL, 127);
+    synth.note_on(0.02, 1, Midi::NOTE_A_3, 127);
+    synth.note_off(0.03, 1, Midi::NOTE_A_3, 127);
+    synth.note_on(0.04, 1, Midi::NOTE_A_3, 127);
+    synth.note_off(0.05, 1, Midi::NOTE_A_3, 127);
+    synth.note_on(0.06, 1, Midi::NOTE_A_3, 127);
+    synth.control_change(0.07, 1, Midi::SUSTAIN_PEDAL, 0);
+    synth.note_off(0.08, 1, Midi::NOTE_A_3, 127);
+
+    SignalProducer::produce<Synth>(synth, 1, block_size / 10);
+
+    rendered_samples = SignalProducer::produce<Synth>(synth, 2);
+    expected_samples = SignalProducer::produce<Constant>(expected, 2);
+
+    for (Integer c = 0; c != synth.get_channels(); ++c) {
+        assert_eq(
+            expected_samples[c],
+            rendered_samples[c],
+            block_size,
+            "channel=%d",
+            (int)c
+        );
+    }
+})
+
+
+TEST(sustain_off_leaves_garbage_collected_and_deferred_stopped_and_reallocated_note_ringing_if_key_is_still_held_down, {
+    constexpr Integer block_size = 2048;
+    constexpr Frequency sample_rate = 22050.0;
+
+    Synth synth(0);
+    SumOfSines expected(
+        OUT_VOLUME_PER_CHANNEL, 220.0,
+        0.0, 0.0,
+        0.0, 0.0,
+        synth.get_channels()
+    );
+    Sample const* const* rendered_samples;
+    Sample const* const* expected_samples;
+
+    synth.set_block_size(block_size);
+    synth.set_sample_rate(sample_rate);
+
+    expected.set_block_size(block_size);
+    expected.set_sample_rate(sample_rate);
+
+    set_param(synth, Synth::ParamId::MAMP, 0.5);
+    set_param(synth, Synth::ParamId::CAMP, 0.5);
+
+    set_up_quickly_decaying_envelope(synth);
+
+    synth.process_messages();
+
+    synth.control_change(0.0, 1, Midi::SUSTAIN_PEDAL, 127);
+    synth.note_on(0.000001, 1, Midi::NOTE_A_3, 127);
+    SignalProducer::produce<Synth>(synth, 1); /* note starts then decays */
+    SignalProducer::produce<Synth>(synth, 2); /* voice gets garbage collected */
+
+    set_param(synth, Synth::ParamId::N1HLD, 1.0);
+    synth.process_messages();
+
+    synth.note_off(0.0, 1, Midi::NOTE_A_3, 127); /* note off is deferred due to sustain pedal */
+    synth.note_on(0.0000001, 1, Midi::NOTE_A_3, 127); /* new voice allocated to the note */
+    synth.control_change(0.0000002, 1, Midi::SUSTAIN_PEDAL, 0); /* second voice should keep ringing */
+
+    rendered_samples = SignalProducer::produce<Synth>(synth, 3);
+    expected_samples = SignalProducer::produce<SumOfSines>(expected, 3);
+
+    assert_eq(expected_samples[0], rendered_samples[0], block_size, 0.001);
+    assert_eq(expected_samples[1], rendered_samples[1], block_size, 0.001);
+})
+
+
+void assert_message_dirtiness(
+        Synth& synth,
+        Synth::MessageType const message_type,
+        bool const expected_dirtiness
+) {
+    assert_false(
+        synth.is_dirty(),
+        "Expected synth not to be dirty before sending message; message=%d",
+        (int)message_type
+    );
+
+    synth.push_message(
+        message_type, Synth::ParamId::MVOL, 0.123, Synth::ControllerId::MACRO_1
+    );
+    assert_false(
+        synth.is_dirty(),
+        "Expected synth not to become dirty before processing message; message=%d",
+        (int)message_type
+    );
+
+    synth.process_messages();
+
+    if (expected_dirtiness) {
+        assert_true(
+            synth.is_dirty(),
+            "Expected synth to become dirty after processing message; message=%d",
+            (int)message_type
+        );
+    } else {
+        assert_false(
+            synth.is_dirty(),
+            "Expected synth not to become dirty after processing message; message=%d",
+            (int)message_type
+        );
+    }
+
+    synth.clear_dirty_flag();
+    assert_false(
+        synth.is_dirty(),
+        "Expected synth not to remain dirty after clearing the flag; message=%d",
+        (int)message_type
+    );
+}
+
+
+TEST(when_synth_config_changes_then_synth_becomes_dirty, {
+    Synth synth;
+
+    assert_message_dirtiness(synth, SET_PARAM, true);
+    assert_message_dirtiness(synth, ASSIGN_CONTROLLER, true);
+    assert_message_dirtiness(synth, REFRESH_PARAM, false);
+    assert_message_dirtiness(synth, CLEAR, true);
+})
+
+
+TEST(can_process_messages_synchronously, {
+    Synth synth;
+    Synth::Message message(SET_PARAM, Synth::ParamId::PM, 0.123, 0);
+
+    assert_false(synth.is_dirty());
+
+    synth.process_message(message);
+    assert_true(synth.is_dirty());
+
+    synth.clear_dirty_flag();
+    assert_false(synth.is_dirty());
+
+    synth.process_message(
+        ASSIGN_CONTROLLER, Synth::ParamId::FM, 0.0, Synth::ControllerId::MACRO_1
+    );
+    assert_true(synth.is_dirty());
+
+    assert_eq(
+        0.123, synth.get_param_ratio_atomic(Synth::ParamId::PM), DOUBLE_DELTA
+    );
+    assert_eq(
+        Synth::ControllerId::MACRO_1,
+        synth.get_param_controller_id_atomic(Synth::ParamId::FM)
+    );
+})
+
+
+void set_up_peak_controller_test(Synth& synth)
+{
+    synth.set_block_size(PEAK_CTL_TEST_BLOCK_SIZE);
+    synth.set_sample_rate(44100.0);
+    synth.note_on(0.0, 1, Midi::NOTE_A_4, 127);
+
+    synth.modulator_params.amplitude.set_value(1.0);
+    synth.modulator_params.panning.set_value(1.0);
+    synth.modulator_params.volume.set_value(PEAK_CTL_TEST_OSC_1_VOL);
+
+    synth.carrier_params.amplitude.set_value(1.0);
+    synth.carrier_params.panning.set_value(1.0);
+    synth.carrier_params.volume.set_value(PEAK_CTL_TEST_OSC_2_VOL);
+
+    synth.effects.filter_1_type.set_value(BiquadFilter<SignalProducer>::HIGH_SHELF);
+    synth.effects.filter_1.frequency.set_value(1.0);
+    synth.effects.filter_1.gain.set_value(PEAK_CTL_TEST_FILTER_1_GAIN);
+
+    synth.effects.reverb.dry.set_value(PEAK_CTL_TEST_REVERB_DRY);
+}
+
+
+TEST(peak_controllers_are_not_updated_when_they_are_not_assigned_to_any_parameter, {
+    Synth synth;
+
+    set_up_peak_controller_test(synth);
+
+    synth.generate_samples(1, PEAK_CTL_TEST_BLOCK_SIZE);
+
+    assert_eq(0.0, synth.osc_1_peak.get_value());
+    assert_eq(0.0, synth.osc_2_peak.get_value());
+    assert_eq(0.0, synth.vol_1_peak.get_value());
+    assert_eq(0.0, synth.vol_2_peak.get_value());
+    assert_eq(0.0, synth.vol_3_peak.get_value());
+})
+
+
+void test_peak_controller(
+        Synth::ControllerId const controller_id,
+        Number const expected_value
+) {
+    Synth synth;
+    MidiController const* controller = NULL;
+
+    set_up_peak_controller_test(synth);
+    assign_controller(synth, Synth::ParamId::M1IN, controller_id);
+
+    synth.generate_samples(1, PEAK_CTL_TEST_BLOCK_SIZE);
+
+    switch (controller_id) {
+        case Synth::ControllerId::OSC_1_PEAK: controller = &synth.osc_1_peak; break;
+        case Synth::ControllerId::OSC_2_PEAK: controller = &synth.osc_2_peak; break;
+        case Synth::ControllerId::VOL_1_PEAK: controller = &synth.vol_1_peak; break;
+        case Synth::ControllerId::VOL_2_PEAK: controller = &synth.vol_2_peak; break;
+        case Synth::ControllerId::VOL_3_PEAK: controller = &synth.vol_3_peak; break;
+        default: break;
+    }
+
+    assert_eq(expected_value, controller->get_value(), 0.005);
+}
+
+
+TEST(peak_controllers_are_updated_when_in_use, {
+    Number const osc_1_expected = PEAK_CTL_TEST_OSC_1_VOL;
+    Number const osc_2_expected = PEAK_CTL_TEST_OSC_2_VOL;
+    Number const vol_1_expected = 1.0; /* osc_1_expected + osc_2_expected > 1.0 */
+    Number const vol_2_expected = (
+        Math::db_to_linear(PEAK_CTL_TEST_FILTER_1_GAIN)
+        * (osc_1_expected + osc_2_expected)
+    );
+    Number const vol_3_expected = PEAK_CTL_TEST_REVERB_DRY * vol_2_expected;
+
+    test_peak_controller(Synth::ControllerId::OSC_1_PEAK, osc_1_expected);
+    test_peak_controller(Synth::ControllerId::OSC_2_PEAK, osc_2_expected);
+    test_peak_controller(Synth::ControllerId::VOL_1_PEAK, vol_1_expected);
+    test_peak_controller(Synth::ControllerId::VOL_2_PEAK, vol_2_expected);
+    test_peak_controller(Synth::ControllerId::VOL_3_PEAK, vol_3_expected);
 })

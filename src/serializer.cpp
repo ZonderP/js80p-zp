@@ -32,6 +32,8 @@ namespace JS80P
 
 std::string const Serializer::CONTROLLER_SUFFIX = "ctl";
 
+std::string const Serializer::LINE_END = "\r\n";
+
 
 std::string Serializer::serialize(Synth const& synth) noexcept
 {
@@ -39,6 +41,7 @@ std::string Serializer::serialize(Synth const& synth) noexcept
     char line[line_size];
     std::string serialized("");
 
+    serialized.reserve(MAX_SIZE);
     serialized += "[";
     serialized += JS80P_SECTION_NAME;
     serialized += "]";
@@ -49,31 +52,88 @@ std::string Serializer::serialize(Synth const& synth) noexcept
         std::string const param_name = synth.get_param_name(param_id);
 
         if (param_name.length() > 0) {
-            snprintf(
-                line,
-                line_size,
-                "%s = %.15f%s",
-                param_name.c_str(),
-                synth.get_param_ratio_atomic(param_id),
-                LINE_END
+            Synth::ControllerId const controller_id = (
+                synth.get_param_controller_id_atomic(param_id)
             );
-            serialized += line;
 
-            snprintf(
-                line,
-                line_size,
-                "%s%s = %.15f\r\n",
-                param_name.c_str(),
-                CONTROLLER_SUFFIX.c_str(),
-                controller_id_to_float(
-                    synth.get_param_controller_id_atomic(param_id)
-                )
-            );
-            serialized += line;
+            if (controller_id == Synth::ControllerId::NONE) {
+                Number const set_ratio = synth.get_param_ratio_atomic(param_id);
+                Number const default_ratio = synth.get_param_default_ratio(param_id);
+
+                if (std::fabs(default_ratio - set_ratio) > 0.000001) {
+                    int const length = snprintf(
+                        line,
+                        line_size,
+                        "%s = %.15f",
+                        param_name.c_str(),
+                        set_ratio
+                    );
+                    trim_excess_zeros_from_end_after_snprintf(line, length, line_size);
+                    serialized += line;
+                    serialized += LINE_END;
+                }
+            } else {
+                int const length = snprintf(
+                    line,
+                    line_size,
+                    "%s%s = %.15f",
+                    param_name.c_str(),
+                    CONTROLLER_SUFFIX.c_str(),
+                    controller_id_to_float(controller_id)
+                );
+                trim_excess_zeros_from_end_after_snprintf(line, length, line_size);
+                serialized += line;
+                serialized += LINE_END;
+            }
         }
     }
 
     return serialized;
+}
+
+
+void Serializer::trim_excess_zeros_from_end_after_snprintf(
+        char* number,
+        int const length,
+        size_t const max_length
+) noexcept {
+    if (UNLIKELY(length < 1 || max_length < 1)) {
+        return;
+    }
+
+    size_t dot_index = max_length;
+
+    for (size_t i = 0; number[i] != '\x00' && i != max_length; ++i) {
+        if (number[i] == '.') {
+            dot_index = i;
+
+            break;
+        }
+    }
+
+    if (UNLIKELY(dot_index == max_length)) {
+        return;
+    }
+
+    size_t last_zero_index = max_length;
+
+    for (size_t i = dot_index; number[i] != '\x00' && i != max_length; ++i) {
+        if (number[i] != '0') {
+            last_zero_index = max_length;
+        } else if (last_zero_index == max_length) {
+            last_zero_index = i;
+        }
+    }
+
+    if (last_zero_index == max_length) {
+        return;
+    }
+
+    ++last_zero_index;
+
+    if (last_zero_index < max_length) {
+        number[last_zero_index] = '\x00';
+    }
 }
 
 
@@ -93,21 +153,30 @@ Synth::ControllerId Serializer::float_to_controller_id(
 }
 
 
-void Serializer::import(Synth& synth, std::string const& serialized) noexcept
-{
-    reset_all_params_to_default(synth);
-    Lines* lines = parse_lines(serialized);
-    process_lines(synth, lines);
-
-    delete lines;
+void Serializer::import_patch_in_gui_thread(
+        Synth& synth,
+        std::string const& serialized
+) noexcept {
+    import_patch<Thread::GUI>(synth, serialized);
 }
 
 
-void Serializer::reset_all_params_to_default(Synth& synth) noexcept
+void Serializer::import_patch_in_audio_thread(
+        Synth& synth,
+        std::string const& serialized
+) noexcept {
+    synth.process_messages();
+    import_patch<Thread::AUDIO>(synth, serialized);
+}
+
+
+template<Serializer::Thread thread>
+void Serializer::import_patch(Synth& synth, std::string const& serialized) noexcept
 {
-    synth.push_message(
-        Synth::MessageType::CLEAR, Synth::ParamId::MAX_PARAM_ID, 0.0, 0
-    );
+    Lines* lines = parse_lines(serialized);
+    process_lines<thread>(synth, lines);
+
+    delete lines;
 }
 
 
@@ -199,6 +268,7 @@ bool Serializer::is_section_name_char(char const c) noexcept
 }
 
 
+template<Serializer::Thread thread>
 void Serializer::process_lines(Synth& synth, Lines* lines) noexcept
 {
     typedef std::vector<Synth::Message> Messages;
@@ -207,7 +277,7 @@ void Serializer::process_lines(Synth& synth, Lines* lines) noexcept
     char section_name[8];
     bool inside_js80p_section = false;
 
-    messages.reserve(600);
+    messages.reserve(800);
 
     for (Lines::const_iterator it = lines->begin(); it != lines->end(); ++it) {
         std::string line = *it;
@@ -224,16 +294,34 @@ void Serializer::process_lines(Synth& synth, Lines* lines) noexcept
         }
     }
 
+    send_message<thread>(
+        synth,
+        Synth::Message(
+            Synth::MessageType::CLEAR, Synth::ParamId::MAX_PARAM_ID, 0.0, 0
+        )
+    );
+
     for (Messages::const_iterator it = messages.begin(); it != messages.end(); ++it) {
         if (synth.is_toggle_param(it->param_id)) {
-            synth.push_message(*it);
+            send_message<thread>(synth, *it);
         }
     }
 
     for (Messages::const_iterator it = messages.begin(); it != messages.end(); ++it) {
         if (!synth.is_toggle_param(it->param_id)) {
-            synth.push_message(*it);
+            send_message<thread>(synth, *it);
         }
+    }
+}
+
+
+template<Serializer::Thread thread>
+void Serializer::send_message(Synth& synth, Synth::Message const& message) noexcept
+{
+    if constexpr (thread == Thread::AUDIO) {
+        synth.process_message(message);
+    } else {
+        synth.push_message(message);
     }
 }
 

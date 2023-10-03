@@ -47,11 +47,11 @@ class Bank
                     std::string const& serialized
                 );
 
-                Program(Program const& program);
-                Program(Program const&& program);
+                Program(Program const& program) = default;
+                Program(Program&& program) = default;
 
-                Program& operator=(Program const& program);
-                Program& operator=(Program const&& program);
+                Program& operator=(Program const& program) = default;
+                Program& operator=(Program&& program) = default;
 
                 std::string const& get_name() const;
                 std::string const& get_short_name() const;
@@ -114,6 +114,7 @@ class Bank
         void set_current_program_index(size_t const new_index);
 
         void import(std::string const& serialized_bank);
+        void import_names(std::string const& serialized_bank);
         std::string serialize() const;
 
     private:
@@ -126,7 +127,7 @@ class Bank
             1.0 / (Number)(NUMBER_OF_PROGRAMS - 1)
         );
 
-        void reset();
+        void generate_empty_programs(size_t const start_index);
 
         Program programs[NUMBER_OF_PROGRAMS];
         size_t current_program_index;
